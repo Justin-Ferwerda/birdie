@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getMyPlayerNumber, setMyPlayerNumber } from '../lib/identity';
+import {
+  clearMyPlayerNumber,
+  getMyPlayerNumber,
+  setMyPlayerNumber,
+} from '../lib/identity';
 import { useActiveTournament } from './useActiveTournament';
 
 export function useMyPlayer() {
@@ -21,5 +25,10 @@ export function useMyPlayer() {
     [tournament_id],
   );
 
-  return { playerNumber, setPlayer, isReady: !!tournament_id };
+  const clearPlayer = useCallback(() => {
+    clearMyPlayerNumber();
+    setPlayerNumberState(null);
+  }, []);
+
+  return { playerNumber, setPlayer, clearPlayer, isReady: !!tournament_id };
 }

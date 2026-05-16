@@ -7,7 +7,7 @@ import Avatar from '../components/Avatar';
 export default function Home() {
   const tournament = useActiveTournament();
   const players = useTournamentPlayers();
-  const { playerNumber } = useMyPlayer();
+  const { playerNumber, clearPlayer } = useMyPlayer();
 
   const me = players.data?.find((p) => p.player_number === playerNumber) ?? null;
 
@@ -41,6 +41,16 @@ export default function Home() {
       <p className="text-xs text-slate-500">
         Leaderboard, feed, and per-round stats fill in as later phases ship.
       </p>
+
+      {me && (
+        <button
+          type="button"
+          onClick={clearPlayer}
+          className="self-center text-xs text-slate-500 underline-offset-2 hover:underline"
+        >
+          Not {me.display_name.split(' ')[0]}? Switch player
+        </button>
+      )}
     </section>
   );
 }
