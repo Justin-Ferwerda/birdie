@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from './Avatar';
@@ -9,9 +9,14 @@ import Avatar from './Avatar';
  * useMyPlayer; no auth, no server state.
  */
 export default function IdentityPicker() {
-  const { setPlayer } = useMyPlayer();
+  const { setPlayer, lastSelected } = useMyPlayer();
   const players = useTournamentPlayers();
-  const [pending, setPending] = useState<number | null>(null);
+  const [pending, setPending] = useState<number | null>(lastSelected);
+
+  // If lastSelected hydrates after first render, pick it up.
+  useEffect(() => {
+    if (pending == null && lastSelected != null) setPending(lastSelected);
+  }, [lastSelected, pending]);
 
   if (players.isLoading || !players.data) {
     return (

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { create } from 'zustand';
 import {
   clearMyPlayerNumber,
+  getLastSelected,
   getMyPlayerNumber,
   setMyPlayerNumber,
 } from '../lib/identity';
@@ -12,6 +13,7 @@ import { useActiveTournament } from './useActiveTournament';
 // and a setPlayer call in one didn't re-render the others.
 interface IdentityStore {
   playerNumber: number | null;
+  lastSelected: number | null;
   hydratedForTournament: string | null;
   hydrate: (tournament_id: string) => void;
   set: (tournament_id: string, n: number) => void;
@@ -20,16 +22,22 @@ interface IdentityStore {
 
 const useIdentityStore = create<IdentityStore>((set) => ({
   playerNumber: null,
+  lastSelected: null,
   hydratedForTournament: null,
   hydrate: (tournament_id) => {
     set({
       playerNumber: getMyPlayerNumber(tournament_id),
+      lastSelected: getLastSelected(tournament_id),
       hydratedForTournament: tournament_id,
     });
   },
   set: (tournament_id, n) => {
     setMyPlayerNumber(tournament_id, n);
-    set({ playerNumber: n, hydratedForTournament: tournament_id });
+    set({
+      playerNumber: n,
+      lastSelected: n,
+      hydratedForTournament: tournament_id,
+    });
   },
   clear: () => {
     clearMyPlayerNumber();
@@ -42,6 +50,7 @@ export function useMyPlayer() {
   const tournament_id = tournament.data?.id;
 
   const playerNumber = useIdentityStore((s) => s.playerNumber);
+  const lastSelected = useIdentityStore((s) => s.lastSelected);
   const hydratedFor = useIdentityStore((s) => s.hydratedForTournament);
   const hydrate = useIdentityStore((s) => s.hydrate);
   const setRaw = useIdentityStore((s) => s.set);
@@ -62,6 +71,7 @@ export function useMyPlayer() {
 
   return {
     playerNumber,
+    lastSelected,
     setPlayer,
     clearPlayer: clearRaw,
     isReady: !!tournament_id,
