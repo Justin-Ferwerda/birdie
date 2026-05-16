@@ -306,6 +306,14 @@ export default function Scorecard() {
                           <span className="text-xs font-medium leading-tight text-slate-100">
                             {p.display_name}
                           </span>
+                          {p.allowed_courses != null && p.allowed_courses.length < 3 && (
+                            <span
+                              className="rounded bg-slate-800 px-1 py-0.5 text-[8px] uppercase tracking-wider text-slate-400"
+                              title={`Guest — plays ${p.allowed_courses.join(', ')}`}
+                            >
+                              Guest
+                            </span>
+                          )}
                           {aceCount > 0 && (
                             <span
                               className="text-[10px] leading-none"

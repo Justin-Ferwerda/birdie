@@ -7,6 +7,8 @@ export interface SetupPlayer {
   card_number: 1 | 2 | 3;
   is_scorekeeper: boolean;
   avatar_id: string | null;
+  /** Null = plays all 3 courses. Set to a subset for guests. */
+  allowed_courses: string[] | null;
   /** If the user picked an existing person from the autocomplete, their id. */
   existing_person_id?: string;
 }
@@ -61,6 +63,7 @@ async function startTournament({ tournament_id, players }: StartTournamentArgs) 
       display_name: trimmed,
       card_number: p.card_number,
       is_scorekeeper: p.is_scorekeeper,
+      allowed_courses: p.allowed_courses,
     };
   });
 
