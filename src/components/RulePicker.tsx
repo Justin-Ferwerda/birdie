@@ -57,7 +57,7 @@ export default function RulePicker({ ctx, selectedKey, onSelect }: RulePickerPro
                 </span>
               )}
             </div>
-            <p className="line-clamp-2 text-[11px] leading-snug text-slate-400">
+            <p className="text-[11px] leading-snug text-slate-400">
               {r.description}
             </p>
           </button>
