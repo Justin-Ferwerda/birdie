@@ -271,13 +271,16 @@ export const RULES: Rule[] = [
     key: 'the_classic',
     displayName: 'The Classic',
     description:
-      "Required on Seven Oaks H6. Clear the amateur pad. Fail → pants down for the next throw.",
+      'Required on Seven Oaks H6 and Cedar Hill H10. Clear the amateur pad. Fail → pants down for the next throw.',
     emoji: '👖',
     shape: 'flag_only',
-    oneTimePerPlayer: true,
+    // Two separate occurrences (Seven Oaks H6 + Cedar Hill H10); each
+    // gets its own prompt, so this isn't a one-time-per-player rule.
+    oneTimePerPlayer: false,
     computeDelta: () => 0,
     customEligible: (ctx) =>
-      ctx.hole.course_id === 'seven_oaks' && ctx.hole.hole_number === 6,
+      (ctx.hole.course_id === 'seven_oaks' && ctx.hole.hole_number === 6) ||
+      (ctx.hole.course_id === 'cedar_hill' && ctx.hole.hole_number === 10),
     notificationText: (a, players) =>
       `${nameOf(a.primary_player_number, players)} faced The Classic`,
   }),

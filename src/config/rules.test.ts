@@ -231,17 +231,37 @@ describe('eligible — phase gating', () => {
 // --------------------------------------------------------------------------
 
 describe('eligible — rule-specific', () => {
-  it('the_classic is only eligible on Seven Oaks H6', () => {
+  it('the_classic is eligible on Seven Oaks H6 and Cedar Hill H10', () => {
     const r = rule('the_classic');
     expect(
       r.eligible(ctx({ hole: { par: 4, course_id: 'seven_oaks', hole_number: 6 } })),
     ).toBe(true);
     expect(
+      r.eligible(ctx({ hole: { par: 4, course_id: 'cedar_hill', hole_number: 10 } })),
+    ).toBe(true);
+    // Same course, other holes: no.
+    expect(
       r.eligible(ctx({ hole: { par: 4, course_id: 'seven_oaks', hole_number: 7 } })),
     ).toBe(false);
     expect(
+      r.eligible(ctx({ hole: { par: 4, course_id: 'cedar_hill', hole_number: 11 } })),
+    ).toBe(false);
+    // Same hole number, wrong course: no.
+    expect(
       r.eligible(ctx({ hole: { par: 4, course_id: 'crockett', hole_number: 6 } })),
     ).toBe(false);
+  });
+
+  it('the_classic stays eligible after a prior use (two occurrences per round)', () => {
+    const r = rule('the_classic');
+    expect(
+      r.eligible(
+        ctx({
+          hole: { par: 4, course_id: 'cedar_hill', hole_number: 10 },
+          usedRuleKeys: new Set(['the_classic']),
+        }),
+      ),
+    ).toBe(true);
   });
 
   it('the_shotgun is never eligible from the regular rule picker', () => {

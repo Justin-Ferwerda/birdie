@@ -53,7 +53,9 @@ export default function ScoreEntrySheet({
   enteredByPlayerNumber,
   onClose,
 }: ScoreEntrySheetProps) {
-  const isClassicHole = hole.course_id === 'seven_oaks' && hole.hole_number === 6;
+  const isClassicHole =
+    (hole.course_id === 'seven_oaks' && hole.hole_number === 6) ||
+    (hole.course_id === 'cedar_hill' && hole.hole_number === 10);
   const initialClassicCleared: boolean | null =
     currentRuleKey === 'the_classic'
       ? ((currentRuleOutcome?.success as boolean | undefined) ?? null)
