@@ -10,3 +10,55 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
 }
+
+/* --- Celebration animations (Phase 9) ------------------------------------ */
+
+@keyframes pulse-gold {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
+  70%  { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+}
+
+@keyframes pulse-ace {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 175, 55, 1); transform: scale(1); }
+  40%  { box-shadow: 0 0 0 16px rgba(212, 175, 55, 0); transform: scale(1.18); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); transform: scale(1); }
+}
+
+.animate-cell-birdie { animation: pulse-gold 900ms ease-out 1; }
+.animate-cell-eagle  { animation: pulse-gold 600ms ease-out 2; }
+.animate-cell-ace    { animation: pulse-ace 800ms ease-out 2; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(212, 175, 55, 0.12) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cell-birdie,
+  .animate-cell-eagle,
+  .animate-cell-ace,
+  .animate-shimmer::after {
+    animation: none;
+  }
+}

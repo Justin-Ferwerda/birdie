@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import PutterSabotageTakeover from './PutterSabotageTakeover';
+import { celebrate } from '../lib/celebrate';
 import type { ActivityEvent } from '../types/database';
 
 type EventPayload = {
@@ -108,18 +109,26 @@ function handleEvent(
   const hole = p.hole_number ?? null;
   const holeSuffix = hole != null ? ` (H${hole})` : '';
 
+  const cellKey =
+    event.player_number != null && event.hole_id
+      ? `${event.player_number}:${event.hole_id}`
+      : null;
+
   switch (event.event_type) {
     case 'ace':
       toast.success(`🥇 ACE — ${name}${holeSuffix}!`, {
         duration: 6000,
         className: 'text-base font-bold',
       });
+      if (cellKey) celebrate(cellKey, 'ace');
       break;
     case 'eagle':
       toast.success(`🦅 Eagle — ${name}${holeSuffix}`, { duration: 5000 });
+      if (cellKey) celebrate(cellKey, 'eagle');
       break;
     case 'birdie':
       toast.success(`🐦 Birdie — ${name}${holeSuffix}`, { duration: 3500 });
+      if (cellKey) celebrate(cellKey, 'birdie');
       break;
     case 'double_bogey_or_worse':
       toast.error(`💀 ${name} ${p.strokes ?? '?'}${holeSuffix}`, { duration: 3500 });

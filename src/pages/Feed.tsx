@@ -178,17 +178,17 @@ function FeedEntry({ event }: { event: ActivityEvent }) {
 function accentForType(type: ActivityEventType): string {
   switch (type) {
     case 'ace':
-      return 'border-gold-500 bg-gold-500/15 text-gold-300';
+      return 'border-gold-500 bg-gold-500/15 text-gold-300 animate-shimmer';
     case 'eagle':
-      return 'border-fuchsia-500/60 bg-fuchsia-500/10 text-fuchsia-200';
+      return 'border-fuchsia-500/60 bg-fuchsia-500/10 text-fuchsia-200 animate-shimmer';
     case 'birdie':
-      return 'border-gold-500/50 bg-gold-500/5 text-gold-200';
+      return 'border-gold-500/50 bg-gold-500/5 text-gold-200 animate-shimmer';
     case 'double_bogey_or_worse':
       return 'border-rose-700 bg-rose-900/30 text-rose-200';
     case 'exclusive_ace':
     case 'exclusive_eagle':
     case 'exclusive_birdie':
-      return 'border-gold-400 bg-gold-500/15 text-gold-200';
+      return 'border-gold-400 bg-gold-500/15 text-gold-200 animate-shimmer';
     case 'putter_sabotage_target':
       return 'border-rose-700 bg-rose-900/30 text-rose-200';
     default:

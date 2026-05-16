@@ -10,6 +10,7 @@ import ScoreEntrySheet from '../components/ScoreEntrySheet';
 import DeclareSheet from '../components/DeclareSheet';
 import { categorize, cellClasses, formatToPar } from '../lib/scoring';
 import { getRule } from '../config/rules';
+import { useCellPulse } from '../lib/celebrate';
 import type { CourseId, Hole, RuleActivation, Score } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 
@@ -197,6 +198,14 @@ export default function Scorecard() {
                 if (!s) return acc;
                 return acc + (s.strokes - courseHoles[i].par) + (s.rule_delta ?? 0);
               }, 0);
+              // Across the whole tournament, not just this course, for badges.
+              const allMine = (scores.data ?? []).filter(
+                (s) => s.player_number === p.player_number,
+              );
+              const aceCount = allMine.filter((s) => s.strokes === 1).length;
+              const eagleCount = allMine.filter(
+                (s) => s.strokes > 1 && s.hole_score_to_par <= -2,
+              ).length;
               return (
                 <tr key={p.player_number} className="border-t border-slate-800">
                   <th className="sticky left-0 z-10 bg-slate-900 px-2 py-1.5 text-left">
@@ -207,8 +216,26 @@ export default function Scorecard() {
                         size={28}
                       />
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-slate-100">
-                          {p.display_name}
+                        <div className="flex items-center gap-1">
+                          <span className="truncate text-xs font-medium text-slate-100">
+                            {p.display_name}
+                          </span>
+                          {aceCount > 0 && (
+                            <span
+                              className="text-[10px] leading-none"
+                              title={`${aceCount} ace${aceCount === 1 ? '' : 's'}`}
+                            >
+                              🥇{aceCount > 1 && <sup>{aceCount}</sup>}
+                            </span>
+                          )}
+                          {eagleCount > 0 && (
+                            <span
+                              className="text-[10px] leading-none"
+                              title={`${eagleCount} eagle${eagleCount === 1 ? '' : 's'}`}
+                            >
+                              🦅{eagleCount > 1 && <sup>{eagleCount}</sup>}
+                            </span>
+                          )}
                         </div>
                         {p.is_scorekeeper && (
                           <div className="text-[9px] uppercase tracking-wider text-emerald-400">
@@ -220,9 +247,6 @@ export default function Scorecard() {
                   </th>
                   {courseHoles.map((h, i) => {
                     const score = playerScores[i];
-                    const strokes = score?.strokes ?? null;
-                    const category =
-                      strokes != null ? categorize(strokes, h.par) : null;
                     const primary = primaryActivationByKey.get(
                       `${p.player_number}:${h.id}`,
                     );
@@ -232,39 +256,18 @@ export default function Scorecard() {
                     const sabotage = sabotageByKey.get(
                       `${p.player_number}:${h.id}`,
                     );
-                    const activeRule =
-                      primary?.rule_key ?? incoming?.rule_key ?? null;
-                    const ruleEmoji = activeRule ? getRule(activeRule)?.emoji : null;
                     return (
-                      <td
+                      <ScoreCell
                         key={h.id}
-                        className="min-w-9 px-1 py-1.5 text-center align-top"
-                      >
-                        <button
-                          type="button"
-                          disabled={!canEdit}
-                          onClick={() => setEntry({ player: p, hole: h })}
-                          className={[
-                            'flex h-8 w-8 items-center justify-center text-sm tabular-nums transition-colors',
-                            strokes != null
-                              ? cellClasses(category!)
-                              : 'rounded-md text-slate-700',
-                            canEdit && strokes == null && 'active:bg-slate-800',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                        >
-                          {strokes ?? '–'}
-                        </button>
-                        <div className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] leading-none">
-                          {ruleEmoji && (
-                            <span title={getRule(activeRule!)?.displayName}>
-                              {ruleEmoji}
-                            </span>
-                          )}
-                          {sabotage && <span title="Putter Sabotage active">🎯</span>}
-                        </div>
-                      </td>
+                        playerNumber={p.player_number}
+                        hole={h}
+                        strokes={score?.strokes ?? null}
+                        canEdit={canEdit}
+                        primaryRuleKey={primary?.rule_key ?? null}
+                        incomingRuleKey={incoming?.rule_key ?? null}
+                        sabotage={!!sabotage}
+                        onTap={() => setEntry({ player: p, hole: h })}
+                      />
                     );
                   })}
                   <td className="px-2 py-1.5 text-right align-top tabular-nums">
@@ -399,5 +402,65 @@ function CenteredMessage({ children }: { children: React.ReactNode }) {
     <section className="flex h-full items-center justify-center p-6 text-sm text-slate-400">
       {children}
     </section>
+  );
+}
+
+interface ScoreCellProps {
+  playerNumber: number;
+  hole: Hole;
+  strokes: number | null;
+  canEdit: boolean;
+  primaryRuleKey: string | null;
+  incomingRuleKey: string | null;
+  sabotage: boolean;
+  onTap: () => void;
+}
+
+function ScoreCell({
+  playerNumber,
+  hole,
+  strokes,
+  canEdit,
+  primaryRuleKey,
+  incomingRuleKey,
+  sabotage,
+  onTap,
+}: ScoreCellProps) {
+  const pulse = useCellPulse(`${playerNumber}:${hole.id}`);
+  const category = strokes != null ? categorize(strokes, hole.par) : null;
+  const activeRule = primaryRuleKey ?? incomingRuleKey ?? null;
+  const ruleEmoji = activeRule ? getRule(activeRule)?.emoji : null;
+
+  const pulseClass =
+    pulse === 'ace'
+      ? 'animate-cell-ace'
+      : pulse === 'eagle'
+        ? 'animate-cell-eagle'
+        : pulse === 'birdie'
+          ? 'animate-cell-birdie'
+          : '';
+
+  return (
+    <td className="min-w-9 px-1 py-1.5 text-center align-top">
+      <button
+        type="button"
+        disabled={!canEdit}
+        onClick={onTap}
+        className={[
+          'flex h-8 w-8 items-center justify-center text-sm tabular-nums transition-colors',
+          strokes != null ? cellClasses(category!) : 'rounded-md text-slate-700',
+          canEdit && strokes == null && 'active:bg-slate-800',
+          pulseClass,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {strokes ?? '–'}
+      </button>
+      <div className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] leading-none">
+        {ruleEmoji && <span title={getRule(activeRule!)?.displayName}>{ruleEmoji}</span>}
+        {sabotage && <span title="Putter Sabotage active">🎯</span>}
+      </div>
+    </td>
   );
 }
