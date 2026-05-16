@@ -15,4 +15,13 @@ if (!anonKey) {
   );
 }
 
+// Common mistake: pasting the full REST endpoint instead of the project URL.
+// The JS client adds /rest/v1 itself; including it again produces a doubled
+// path and a cryptic PGRST125 error.
+if (/\/rest\/v\d/.test(url) || url.endsWith('/')) {
+  throw new Error(
+    `VITE_SUPABASE_URL should be the bare project URL (e.g. https://xxx.supabase.co), not "${url}". Strip any trailing slash or /rest/v1 path.`,
+  );
+}
+
 export const supabase = createClient(url, anonKey);
