@@ -3,12 +3,19 @@
 -- SQL Editor before Saturday morning.
 --
 -- After running this, the app boots into the Setup screen on next load.
+-- Note: this does NOT clear the per-phone identity stored in browser
+-- localStorage. To re-test the identity picker, open in incognito or
+-- delete the `birdie.myPlayerNumber` key in DevTools.
 
-truncate table activity_events;
-truncate table rule_activations;
-truncate table scores;
-truncate table tournament_players;
-delete from people;
+-- Postgres requires every table that references one of the truncated
+-- tables to be in the same TRUNCATE statement (or CASCADE). Listing
+-- them together avoids 0A000 "cannot truncate" errors.
+truncate table
+  activity_events,
+  rule_activations,
+  scores,
+  tournament_players,
+  people;
 
 update tournaments
    set setup_complete    = false,
