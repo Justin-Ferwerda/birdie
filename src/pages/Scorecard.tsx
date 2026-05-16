@@ -3,11 +3,13 @@ import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useHoles } from '../hooks/useHoles';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import { useScores } from '../hooks/useScores';
+import { useRuleActivations } from '../hooks/useRuleActivations';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
 import ScoreEntrySheet from '../components/ScoreEntrySheet';
 import { categorize, cellClasses, formatToPar } from '../lib/scoring';
-import type { CourseId, Hole, Score } from '../types/database';
+import { getRule } from '../config/rules';
+import type { CourseId, Hole, RuleActivation, Score } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 
 const COURSE_ORDER: CourseId[] = ['seven_oaks', 'crockett', 'cedar_hill'];
@@ -22,6 +24,7 @@ export default function Scorecard() {
   const holes = useHoles();
   const players = useTournamentPlayers();
   const scores = useScores();
+  const ruleActivations = useRuleActivations();
   const { playerNumber: myPlayerNumber } = useMyPlayer();
 
   const me = useMemo(
@@ -64,6 +67,16 @@ export default function Scorecard() {
     });
     return map;
   }, [scores.data]);
+
+  // Index rule activations the same way.
+  const ruleActivationByKey = useMemo(() => {
+    const map = new Map<string, RuleActivation>();
+    (ruleActivations.data ?? []).forEach((a) => {
+      if (a.hole_id == null) return;
+      map.set(`${a.primary_player_number}:${a.hole_id}`, a);
+    });
+    return map;
+  }, [ruleActivations.data]);
 
   const isMyCard = me?.card_number === activeCard;
   const canEdit = !!me?.is_scorekeeper && isMyCard;
@@ -121,9 +134,10 @@ export default function Scorecard() {
                 (acc, s) => acc + (s?.strokes ?? 0),
                 0,
               );
-              const totalToPar = playerScores.reduce((acc, s, i) => {
+              // Adjusted: raw to-par + rule_delta per hole.
+              const totalAdjustedToPar = playerScores.reduce((acc, s, i) => {
                 if (!s) return acc;
-                return acc + (s.strokes - courseHoles[i].par);
+                return acc + (s.strokes - courseHoles[i].par) + (s.rule_delta ?? 0);
               }, 0);
               return (
                 <tr key={p.player_number} className="border-t border-slate-800">
@@ -151,10 +165,16 @@ export default function Scorecard() {
                     const strokes = score?.strokes ?? null;
                     const category =
                       strokes != null ? categorize(strokes, h.par) : null;
+                    const activation = ruleActivationByKey.get(
+                      `${p.player_number}:${h.id}`,
+                    );
+                    const ruleEmoji = activation
+                      ? getRule(activation.rule_key)?.emoji
+                      : null;
                     return (
                       <td
                         key={h.id}
-                        className="min-w-9 px-1 py-1.5 text-center"
+                        className="min-w-9 px-1 py-1.5 text-center align-top"
                       >
                         <button
                           type="button"
@@ -172,17 +192,25 @@ export default function Scorecard() {
                         >
                           {strokes ?? '–'}
                         </button>
+                        {ruleEmoji && (
+                          <div
+                            className="mt-0.5 text-[10px] leading-none"
+                            title={getRule(activation!.rule_key)?.displayName}
+                          >
+                            {ruleEmoji}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
-                  <td className="px-2 py-1.5 text-right tabular-nums">
+                  <td className="px-2 py-1.5 text-right align-top tabular-nums">
                     {totalStrokes === 0 ? (
                       <span className="text-slate-600">–</span>
                     ) : (
                       <div className="flex flex-col items-end leading-tight">
                         <span className="text-slate-100">{totalStrokes}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {formatToPar(totalToPar)}
+                        <span className="text-[10px] text-gold-400">
+                          {formatToPar(totalAdjustedToPar)}
                         </span>
                       </div>
                     )}
@@ -194,19 +222,26 @@ export default function Scorecard() {
         </table>
       </div>
 
-      {entry && tournament.data && me && (
-        <ScoreEntrySheet
-          tournament_id={tournament.data.id}
-          player={entry.player}
-          hole={entry.hole}
-          currentStrokes={
-            scoresByKey.get(`${entry.player.player_number}:${entry.hole.id}`)
-              ?.strokes ?? null
-          }
-          enteredByPlayerNumber={me.player_number}
-          onClose={() => setEntry(null)}
-        />
-      )}
+      {entry && tournament.data && me && (() => {
+        const existingScore = scoresByKey.get(
+          `${entry.player.player_number}:${entry.hole.id}`,
+        );
+        const existingActivation = ruleActivationByKey.get(
+          `${entry.player.player_number}:${entry.hole.id}`,
+        );
+        return (
+          <ScoreEntrySheet
+            tournament_id={tournament.data.id}
+            player={entry.player}
+            hole={entry.hole}
+            currentStrokes={existingScore?.strokes ?? null}
+            currentRuleKey={existingActivation?.rule_key ?? null}
+            currentRuleOutcome={existingActivation?.outcome ?? null}
+            enteredByPlayerNumber={me.player_number}
+            onClose={() => setEntry(null)}
+          />
+        );
+      })()}
     </section>
   );
 }
