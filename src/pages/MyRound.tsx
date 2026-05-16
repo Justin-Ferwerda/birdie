@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import { useHoles } from '../hooks/useHoles';
@@ -243,7 +244,12 @@ export default function MyRound() {
       <section className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <h3 className="text-sm font-semibold text-slate-200">Rules used</h3>
-          <div className="text-xs text-slate-500">{myActivations.length}</div>
+          <Link
+            to={`/wallet/${me.player_number}`}
+            className="text-xs text-slate-400 underline-offset-2 hover:underline"
+          >
+            🎒 Wallet ({myActivations.length})
+          </Link>
         </div>
         {myActivations.length === 0 ? (
           <p className="rounded-md border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-500">

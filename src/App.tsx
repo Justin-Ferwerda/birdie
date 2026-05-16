@@ -7,6 +7,7 @@ import MyRound from './pages/MyRound';
 import Leaderboard from './pages/Leaderboard';
 import Feed from './pages/Feed';
 import Setup from './pages/Setup';
+import RuleWallet from './pages/RuleWallet';
 import IdentityPicker from './components/IdentityPicker';
 import RealtimeListener from './components/RealtimeListener';
 import { useActiveTournament } from './hooks/useActiveTournament';
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/my-round" element={<MyRound />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/feed" element={<Feed />} />
+          <Route path="/wallet/:playerNumber" element={<RuleWallet />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

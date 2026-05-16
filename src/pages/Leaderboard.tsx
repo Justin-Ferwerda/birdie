@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import { useScores } from '../hooks/useScores';
 import { useRuleActivations } from '../hooks/useRuleActivations';
@@ -21,6 +21,7 @@ interface Row {
 }
 
 export default function Leaderboard() {
+  const navigate = useNavigate();
   const players = useTournamentPlayers();
   const scores = useScores();
   const activations = useRuleActivations();
@@ -152,9 +153,18 @@ export default function Leaderboard() {
                     <span>Card {r.card_number}</span>
                     <span>· Thru {r.thru}</span>
                     {r.rules_burned > 0 && (
-                      <span title={`${r.rules_burned} rule${r.rules_burned === 1 ? '' : 's'} used`}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigate(`/wallet/${r.player_number}`);
+                        }}
+                        className="uppercase tracking-wider hover:text-gold-300"
+                        title={`Open ${r.display_name}'s rule wallet`}
+                      >
                         · 🎒 {r.rules_burned}
-                      </span>
+                      </button>
                     )}
                   </div>
                 </div>
