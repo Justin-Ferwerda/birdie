@@ -134,7 +134,7 @@ export default function RuleWallet() {
                   )}
                 </div>
               ) : (
-                <p className="line-clamp-2 text-[10px] leading-snug text-slate-400">
+                <p className="text-[10px] leading-snug text-slate-400">
                   {r.description}
                 </p>
               )}
