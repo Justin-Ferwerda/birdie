@@ -223,8 +223,9 @@ export const RULES: Rule[] = [
   defineRule({
     key: 'baja_blast',
     displayName: 'Baja Blast',
-    description: 'At lunch at Baja Burrito: down a Baja Blast. Earns you –2 on any hole.',
-    emoji: '🥤',
+    description:
+      'At lunch at Baja Burrito: down a serving of the spiciest salsa. Earns you –2 on any hole.',
+    emoji: '🌶️',
     shape: 'tournament_event',
     requiresPhoto: true,
     oneTimePerPlayer: true,
@@ -376,7 +377,8 @@ export const RULES: Rule[] = [
   defineRule({
     key: 'the_trust_fall',
     displayName: 'The Trust Fall',
-    description: 'Blindfolded putt from 5+ yards. Make it → –2.',
+    description:
+      'Blindfolded putt from 5+ yards after spinning 3 times. Your card can align you to face the basket. Make it → –2.',
     emoji: '🙏',
     shape: 'conditional_modifier',
     oneTimePerPlayer: true,
@@ -423,7 +425,7 @@ export const RULES: Rule[] = [
     key: 'play_through_parade',
     displayName: 'The Play-through Parade',
     description:
-      'Non-tournament player walks through your hole and you let them play through. Whole card –1.',
+      'When a non-tournament player asks to play through, the whole card forms an archway with their bodies and lets them walk through. Whole card –1.',
     emoji: '🎺',
     shape: 'whole_card',
     requiresPhoto: true,
