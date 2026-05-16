@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useEnterScore } from '../hooks/useEnterScore';
+import { useDeleteScore } from '../hooks/useDeleteScore';
 import { useRuleActivations } from '../hooks/useRuleActivations';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import Avatar from './Avatar';
@@ -62,8 +63,10 @@ export default function ScoreEntrySheet({
   );
 
   const enterScore = useEnterScore();
+  const deleteScore = useDeleteScore();
   const ruleActivations = useRuleActivations();
   const players = useTournamentPlayers();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Rules this player has already burned. Don't show them as available again.
   const usedRuleKeys = useMemo(
@@ -192,6 +195,21 @@ export default function ScoreEntrySheet({
       setPartnerPlayerNumber(null);
     } else {
       setShowRules(true);
+    }
+  };
+
+  const handleClear = async () => {
+    try {
+      await deleteScore.mutateAsync({
+        tournament_id,
+        player_number: player.player_number,
+        hole_id: hole.id,
+      });
+      toast.success(`Cleared ${player.display_name} on H${hole.hole_number}`);
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not clear: ${msg}`);
     }
   };
 
@@ -357,6 +375,23 @@ export default function ScoreEntrySheet({
                 ? `Pick partner for ${selectedRule?.displayName}`
                 : 'Save'}
         </button>
+
+        {currentStrokes != null && (
+          <button
+            type="button"
+            onClick={() =>
+              confirmDelete ? handleClear() : setConfirmDelete(true)
+            }
+            disabled={deleteScore.isPending}
+            className="self-center text-xs text-rose-400 underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            {deleteScore.isPending
+              ? 'Clearing…'
+              : confirmDelete
+                ? `Tap again to clear ${player.display_name}’s H${hole.hole_number}`
+                : 'Clear score'}
+          </button>
+        )}
       </div>
     </div>
   );
