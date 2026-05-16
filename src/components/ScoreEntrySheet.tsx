@@ -7,7 +7,9 @@ import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import Avatar from './Avatar';
 import RulePicker from './RulePicker';
 import PartnerPicker from './PartnerPicker';
-import PhotoCapture from './PhotoCapture';
+// PhotoCapture deferred post-MVP — iOS Safari camera is unreliable.
+// Re-enable by importing it and dropping the component back into the
+// {selectedRule?.requiresPhoto && (...)} block below.
 import type { Hole } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 import { getRule, type EligibilityContext, type Rule, type RuleOutcome } from '../config/rules';
@@ -338,14 +340,11 @@ export default function ScoreEntrySheet({
               )}
 
               {selectedRule?.requiresPhoto && (
-                <PhotoCapture
-                  tournament_id={tournament_id}
-                  player_number={player.player_number}
-                  rule_key={selectedRule.key}
-                  currentUrl={photoUrl}
-                  onUploaded={setPhotoUrl}
-                  onClear={() => setPhotoUrl(null)}
-                />
+                <p className="text-[11px] text-amber-400/80">
+                  📷 Photo proof required in real life — bring witnesses.
+                  (In-app upload is deferred post-MVP — iOS Safari camera
+                  was unreliable.)
+                </p>
               )}
 
               {selectedRule?.shape === 'whole_card' && (
