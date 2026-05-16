@@ -56,40 +56,27 @@ export async function runHoleCompleteDetection(
   tournament_id: string,
   hole_id: string,
 ) {
-  // 1. Hole metadata first — needed to filter players to those playing
-  //    this course.
-  const hole = await fetchHoleInfo(hole_id);
-  if (!hole) return;
-
-  // 2. Players playing this course (null allowed_courses = all).
+  // 1. How many players are in this tournament right now?
   const { data: players, error: pErr } = await supabase
     .from('tournament_players')
-    .select('player_number, display_name, allowed_courses')
+    .select('player_number, display_name')
     .eq('tournament_id', tournament_id);
   if (pErr) throw pErr;
   if (!players || players.length === 0) return;
+  const N = players.length;
+  const nameByNum = new Map(players.map((p) => [p.player_number, p.display_name]));
 
-  const activeOnCourse = players.filter(
-    (p) =>
-      (p.allowed_courses as string[] | null) == null ||
-      (p.allowed_courses as string[]).includes(hole.course_id),
-  );
-  if (activeOnCourse.length === 0) return;
-  const N = activeOnCourse.length;
-  const activeNums = new Set(activeOnCourse.map((p) => p.player_number));
-  const nameByNum = new Map(
-    activeOnCourse.map((p) => [p.player_number, p.display_name]),
-  );
-
-  // 3. Scores on this hole — only count active players.
-  const { data: allScores, error: sErr } = await supabase
+  // 2. Scores on this hole.
+  const { data: scores, error: sErr } = await supabase
     .from('scores')
     .select('player_number, strokes, hole_score_to_par')
     .eq('tournament_id', tournament_id)
     .eq('hole_id', hole_id);
   if (sErr) throw sErr;
-  const scores = (allScores ?? []).filter((s) => activeNums.has(s.player_number));
-  if (scores.length < N) return;
+  if (!scores || scores.length < N) return;
+
+  // 3. Hole metadata for the event payload.
+  const hole = await fetchHoleInfo(hole_id);
   const sharedPayload = (winner: number | null) => ({
     player_display_name: winner != null ? nameByNum.get(winner) : null,
     hole_number: hole?.hole_number,
@@ -172,27 +159,15 @@ export async function applyGentlemensTeeBonus(
     const cardNumber = act.card_number;
     if (cardNumber == null) continue;
 
-    // Determine the hole's course so we can skip guest players who
-    // aren't playing it (allowed_courses doesn't include this course).
-    const hole = await fetchHoleInfo(hole_id);
-    if (!hole) continue;
-
     const { data: cardPlayers, error: cpErr } = await supabase
       .from('tournament_players')
-      .select('player_number, allowed_courses')
+      .select('player_number')
       .eq('tournament_id', tournament_id)
       .eq('card_number', cardNumber);
     if (cpErr) throw cpErr;
     if (!cardPlayers || cardPlayers.length === 0) continue;
 
-    // Only count card players who are actually on this course. Guests get
-    // no -1 from a Gentlemen's Tee declared on a course they're not playing.
-    const activeCardPlayers = cardPlayers.filter((p) => {
-      const allowed = p.allowed_courses as string[] | null;
-      return allowed == null || allowed.includes(hole.course_id);
-    });
-    if (activeCardPlayers.length === 0) continue;
-    const cardPlayerNums = activeCardPlayers.map((p) => p.player_number);
+    const cardPlayerNums = cardPlayers.map((p) => p.player_number);
 
     const { data: cardScores, error: csErr } = await supabase
       .from('scores')

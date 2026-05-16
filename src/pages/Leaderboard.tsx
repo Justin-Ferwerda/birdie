@@ -6,8 +6,6 @@ import { useRuleActivations } from '../hooks/useRuleActivations';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
 import { formatToPar } from '../lib/scoring';
-import { isFullTournamentPlayer } from '../types/database';
-import type { CourseId } from '../types/database';
 
 type Mode = 'adjusted' | 'raw';
 
@@ -20,7 +18,6 @@ interface Row {
   raw_to_par: number;
   adjusted_to_par: number;
   rules_burned: number;
-  allowed_courses: CourseId[] | null;
 }
 
 export default function Leaderboard() {
@@ -58,35 +55,25 @@ export default function Leaderboard() {
         raw_to_par: raw,
         adjusted_to_par: adjusted,
         rules_burned: rulesByPlayer.get(p.player_number) ?? 0,
-        allowed_courses: p.allowed_courses,
       };
     });
   }, [players.data, scores.data, activations.data]);
 
-  const sortRows = (input: Row[]) =>
-    [...input].sort((a, b) => {
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
       const score =
         mode === 'adjusted'
           ? a.adjusted_to_par - b.adjusted_to_par
           : a.raw_to_par - b.raw_to_par;
       if (score !== 0) return score;
+      // Tiebreak: more holes played → ahead. Then alphabetical.
       if (a.thru !== b.thru) return b.thru - a.thru;
       return a.display_name.localeCompare(b.display_name);
     });
-
-  const mainSorted = useMemo(
-    () => sortRows(rows.filter((r) => isFullTournamentPlayer(r))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, mode],
-  );
-  const guestSorted = useMemo(
-    () => sortRows(rows.filter((r) => !isFullTournamentPlayer(r))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, mode],
-  );
+  }, [rows, mode]);
 
   // Tied position labels (golf convention: "T2" when ties).
-  const positionsFor = (sorted: Row[]) => {
+  const positions = useMemo(() => {
     const out: string[] = [];
     let i = 0;
     while (i < sorted.length) {
@@ -100,17 +87,7 @@ export default function Leaderboard() {
       i = j;
     }
     return out;
-  };
-  const mainPositions = useMemo(
-    () => positionsFor(mainSorted),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mainSorted, mode],
-  );
-  const guestPositions = useMemo(
-    () => positionsFor(guestSorted),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [guestSorted, mode],
-  );
+  }, [sorted, mode]);
 
   return (
     <section className="mx-auto flex max-w-md flex-col gap-3 px-4 py-4">
@@ -139,134 +116,72 @@ export default function Leaderboard() {
         <p className="py-8 text-center text-sm text-slate-500">Loading…</p>
       )}
 
-      {!players.isLoading && mainSorted.length === 0 && guestSorted.length === 0 && (
+      {!players.isLoading && sorted.length === 0 && (
         <p className="rounded-md border border-slate-800 bg-slate-900/60 p-4 text-center text-xs text-slate-500">
           No players yet.
         </p>
       )}
 
-      {mainSorted.length > 0 && (
-        <ol className="flex flex-col gap-1.5">
-          {mainSorted.map((r, i) => (
-            <LeaderboardRow
-              key={r.player_number}
-              row={r}
-              position={mainPositions[i]}
-              isMe={r.player_number === myPlayerNumber}
-              mode={mode}
-              onWalletTap={(pn) => navigate(`/wallet/${pn}`)}
-            />
-          ))}
-        </ol>
-      )}
-
-      {guestSorted.length > 0 && (
-        <>
-          <div className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">
-            Guests
-          </div>
-          <ol className="flex flex-col gap-1.5 opacity-90">
-            {guestSorted.map((r, i) => (
-              <LeaderboardRow
-                key={r.player_number}
-                row={r}
-                position={guestPositions[i]}
-                isMe={r.player_number === myPlayerNumber}
-                mode={mode}
-                onWalletTap={(pn) => navigate(`/wallet/${pn}`)}
-                isGuest
-              />
-            ))}
-          </ol>
-        </>
-      )}
-    </section>
-  );
-}
-
-interface LeaderboardRowProps {
-  row: Row;
-  position: string;
-  isMe: boolean;
-  mode: Mode;
-  onWalletTap: (player_number: number) => void;
-  isGuest?: boolean;
-}
-
-function LeaderboardRow({
-  row: r,
-  position,
-  isMe,
-  mode,
-  onWalletTap,
-  isGuest,
-}: LeaderboardRowProps) {
-  const score = scoreOf(r, mode);
-  return (
-    <li>
-      <Link
-        to={`/scorecard?card=${r.card_number}`}
-        className={[
-          'flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors',
-          isMe
-            ? 'border-emerald-700/70 bg-emerald-900/15'
-            : 'border-slate-800 bg-slate-900/60 active:bg-slate-800',
-        ].join(' ')}
-      >
-        <div className="w-7 text-center text-xs font-semibold tabular-nums text-slate-400">
-          {isGuest ? '·' : position}
-        </div>
-        <Avatar avatarId={r.avatar_id} displayName={r.display_name} size={36} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-slate-100">
-              {r.display_name}
-            </span>
-            {isGuest && (
-              <span className="rounded bg-slate-800 px-1 py-0.5 text-[9px] uppercase tracking-wider text-slate-400">
-                Guest
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-slate-500">
-            <span>Card {r.card_number}</span>
-            <span>· Thru {r.thru}</span>
-            {isGuest && r.allowed_courses && (
-              <span>
-                ·{' '}
-                {r.allowed_courses
-                  .map((c) =>
-                    c === 'seven_oaks' ? 'SO' : c === 'crockett' ? 'CR' : 'CH',
-                  )
-                  .join('+')}
-              </span>
-            )}
-            {r.rules_burned > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onWalletTap(r.player_number);
-                }}
-                className="uppercase tracking-wider hover:text-gold-300"
-                title={`Open ${r.display_name}'s rule wallet`}
+      <ol className="flex flex-col gap-1.5">
+        {sorted.map((r, i) => {
+          const score = scoreOf(r, mode);
+          const isMe = r.player_number === myPlayerNumber;
+          return (
+            <li key={r.player_number}>
+              <Link
+                to={`/scorecard?card=${r.card_number}`}
+                className={[
+                  'flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors',
+                  isMe
+                    ? 'border-emerald-700/70 bg-emerald-900/15'
+                    : 'border-slate-800 bg-slate-900/60 active:bg-slate-800',
+                ].join(' ')}
               >
-                · 🎒 {r.rules_burned}
-              </button>
-            )}
-          </div>
-        </div>
-        <div
-          className={[
-            'text-right text-lg font-bold tabular-nums',
-            scoreColor(score),
-          ].join(' ')}
-        >
-          {r.thru === 0 ? '—' : formatToPar(score)}
-        </div>
-      </Link>
-    </li>
+                <div className="w-7 text-center text-xs font-semibold tabular-nums text-slate-400">
+                  {positions[i]}
+                </div>
+                <Avatar
+                  avatarId={r.avatar_id}
+                  displayName={r.display_name}
+                  size={36}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-slate-100">
+                    {r.display_name}
+                  </div>
+                  <div className="flex gap-2 text-[10px] uppercase tracking-wider text-slate-500">
+                    <span>Card {r.card_number}</span>
+                    <span>· Thru {r.thru}</span>
+                    {r.rules_burned > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigate(`/wallet/${r.player_number}`);
+                        }}
+                        className="uppercase tracking-wider hover:text-gold-300"
+                        title={`Open ${r.display_name}'s rule wallet`}
+                      >
+                        · 🎒 {r.rules_burned}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={[
+                    'text-right text-lg font-bold tabular-nums',
+                    scoreColor(score),
+                  ].join(' ')}
+                >
+                  {r.thru === 0 ? '—' : formatToPar(score)}
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 

@@ -8,32 +8,21 @@ import Avatar from '../components/Avatar';
 import AvatarPicker from '../components/AvatarPicker';
 
 type CardNumber = 1 | 2 | 3;
-type CourseId = 'seven_oaks' | 'crockett' | 'cedar_hill';
 type FormPlayer = {
   name: string;
   card_number: CardNumber;
   is_scorekeeper: boolean;
   avatar_id: string | null;
-  /** null = all 3. Set to a subset for guests. */
-  allowed_courses: CourseId[] | null;
 };
 
 const MIN_PLAYERS = 6;
 const MAX_PLAYERS = 12;
-
-const ALL_COURSES: CourseId[] = ['seven_oaks', 'crockett', 'cedar_hill'];
-const COURSE_LABEL: Record<CourseId, string> = {
-  seven_oaks: 'SO',
-  crockett: 'CR',
-  cedar_hill: 'CH',
-};
 
 const emptyPlayer = (): FormPlayer => ({
   name: '',
   card_number: 1,
   is_scorekeeper: false,
   avatar_id: null,
-  allowed_courses: null,
 });
 
 const defaultCardCount = (playerCount: number): CardNumber =>
@@ -133,29 +122,6 @@ export default function Setup() {
     );
   };
 
-  const toggleCourse = (idx: number, course: CourseId) => {
-    setPlayers((prev) =>
-      prev.map((p, i) => {
-        if (i !== idx) return p;
-        const current = p.allowed_courses ?? [...ALL_COURSES];
-        const has = current.includes(course);
-        let next: CourseId[];
-        if (has) {
-          next = current.filter((c) => c !== course);
-        } else {
-          // Preserve play-order to keep arrays stable.
-          next = ALL_COURSES.filter((c) => current.includes(c) || c === course);
-        }
-        // Don't allow zero — a player must play at least one course.
-        if (next.length === 0) return p;
-        return {
-          ...p,
-          allowed_courses: next.length === ALL_COURSES.length ? null : next,
-        };
-      }),
-    );
-  };
-
   // --- Validation -----------------------------------------------------------
   const validation = useMemo(() => {
     const trimmedNames = activePlayers.map((p) => p.name.trim());
@@ -217,11 +183,6 @@ export default function Setup() {
         card_number: p.card_number,
         is_scorekeeper: p.is_scorekeeper,
         avatar_id: p.avatar_id,
-        // Null = all 3; only persist a subset when the user actually restricted.
-        allowed_courses:
-          p.allowed_courses == null || p.allowed_courses.length === ALL_COURSES.length
-            ? null
-            : p.allowed_courses,
         existing_person_id: existing,
       };
     });
@@ -344,37 +305,6 @@ export default function Setup() {
               >
                 {p.is_scorekeeper ? '✓ Scorekeeper' : 'Scorekeeper'}
               </button>
-            </div>
-
-            <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
-              <span>Plays</span>
-              <div className="flex gap-1">
-                {ALL_COURSES.map((c) => {
-                  const playing =
-                    p.allowed_courses == null || p.allowed_courses.includes(c);
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => toggleCourse(idx, c)}
-                      className={[
-                        'h-6 rounded px-1.5 text-[10px] font-semibold transition-colors',
-                        playing
-                          ? 'bg-gold-500 text-slate-950'
-                          : 'bg-slate-800 text-slate-500',
-                      ].join(' ')}
-                    >
-                      {COURSE_LABEL[c]}
-                    </button>
-                  );
-                })}
-              </div>
-              {p.allowed_courses != null &&
-                p.allowed_courses.length < ALL_COURSES.length && (
-                  <span className="text-slate-400">
-                    · guest ({p.allowed_courses.length}/3)
-                  </span>
-                )}
             </div>
           </li>
         ))}

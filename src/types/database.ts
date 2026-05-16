@@ -44,24 +44,6 @@ export interface TournamentPlayer {
   display_name: string;
   card_number: 1 | 2 | 3;
   is_scorekeeper: boolean;
-  /** Null = plays all 3 courses. Set to a subset for guests / partial
-   *  participants. Detection and whole-card rules respect this. */
-  allowed_courses: CourseId[] | null;
-}
-
-/** True when this player is participating on the given course. */
-export function isPlayerOnCourse(
-  player: Pick<TournamentPlayer, 'allowed_courses'>,
-  course_id: CourseId,
-): boolean {
-  return player.allowed_courses == null || player.allowed_courses.includes(course_id);
-}
-
-/** True when this player is playing the full tournament (all 3 courses). */
-export function isFullTournamentPlayer(
-  player: Pick<TournamentPlayer, 'allowed_courses'>,
-): boolean {
-  return player.allowed_courses == null || player.allowed_courses.length === 3;
 }
 
 export interface Score {
