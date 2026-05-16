@@ -139,9 +139,15 @@ function handleEvent(
         { duration: 4000 },
       );
       break;
-    case 'shotgun_event':
-      toast(`🍺 ${name} survived The Shotgun`, { duration: 5000 });
+    case 'shotgun_event': {
+      const fastest =
+        (p as { fastest_display_name?: string }).fastest_display_name ?? name;
+      toast(`🍺 THE SHOTGUN — fastest: ${fastest}`, {
+        duration: 6000,
+        className: 'text-base font-bold',
+      });
       break;
+    }
     case 'classic_failed':
       toast(`👖 ${name} failed The Classic`, { duration: 5000 });
       break;

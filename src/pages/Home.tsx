@@ -1,15 +1,29 @@
 import { Link } from 'react-router-dom';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
+import { useScores } from '../hooks/useScores';
+import { useHoles } from '../hooks/useHoles';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
 
 export default function Home() {
   const tournament = useActiveTournament();
   const players = useTournamentPlayers();
+  const scores = useScores();
+  const holes = useHoles();
   const { playerNumber, clearPlayer } = useMyPlayer();
 
   const me = players.data?.find((p) => p.player_number === playerNumber) ?? null;
+
+  // Shotgun trigger gate: not yet fired AND at least one Crockett score exists.
+  const crockettHoleIds = new Set(
+    (holes.data ?? []).filter((h) => h.course_id === 'crockett').map((h) => h.id),
+  );
+  const anyCrockettScored = (scores.data ?? []).some((s) =>
+    crockettHoleIds.has(s.hole_id),
+  );
+  const shotgunFired = tournament.data?.shotgun_fired ?? false;
+  const shotgunAvailable = !shotgunFired && anyCrockettScored;
 
   return (
     <section className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
@@ -37,6 +51,15 @@ export default function Home() {
       >
         Enter scores
       </Link>
+
+      {shotgunAvailable && (
+        <Link
+          to="/shotgun"
+          className="rounded-2xl border-2 border-amber-400 bg-amber-500/10 px-5 py-4 text-center text-base font-semibold text-amber-200 active:bg-amber-500/20"
+        >
+          🍺 Fire The Shotgun
+        </Link>
+      )}
 
       <p className="text-xs text-slate-500">
         Leaderboard, feed, and per-round stats fill in as later phases ship.

@@ -48,6 +48,43 @@ async function partnerDelta(
   return rule.computeDelta({ strokes: data.strokes, par: data.par_snapshot });
 }
 
+/** Pending Shotgun activations get consumed on the player's next Crockett
+ *  hole — pulls the delta in, marks the activation no longer pending,
+ *  stamps it with this hole_id so it isn't double-counted. */
+async function findAndConsumeShotgun(
+  tournament_id: string,
+  player_number: number,
+  hole_id: string,
+  course_id: string | undefined,
+): Promise<number> {
+  if (course_id !== 'crockett') return 0;
+
+  const { data, error } = await supabase
+    .from('rule_activations')
+    .select('id, outcome, delta_applied')
+    .eq('tournament_id', tournament_id)
+    .eq('primary_player_number', player_number)
+    .eq('rule_key', 'the_shotgun')
+    .is('hole_id', null)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return 0;
+
+  const delta = data.delta_applied ?? 0;
+  const outcome = (data.outcome as Record<string, unknown> | null) ?? {};
+  const { error: uErr } = await supabase
+    .from('rule_activations')
+    .update({
+      hole_id,
+      outcome: { ...outcome, pending: false, consumed_at: new Date().toISOString() },
+    })
+    .eq('id', data.id);
+  if (uErr) throw uErr;
+
+  return delta;
+}
+
 async function findIncomingPartnerDelta(
   tournament_id: string,
   player_number: number,
@@ -101,6 +138,17 @@ async function enterScore(args: EnterScoreArgs) {
       par_snapshot,
     );
   }
+
+  // Pending Shotgun bonus auto-applies on the player's first Crockett hole
+  // after the Shotgun fired. It stacks with the player's own picked rule
+  // (Marshmallow on this hole + -1 Shotgun → -2 total rule_delta).
+  const shotgunDelta = await findAndConsumeShotgun(
+    tournament_id,
+    player_number,
+    hole_id,
+    args.course_id,
+  );
+  appliedDelta += shotgunDelta;
 
   const { error: sErr } = await supabase
     .from('scores')
