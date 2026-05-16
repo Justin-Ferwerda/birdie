@@ -8,19 +8,24 @@ import { useStartTournament, type SetupPlayer } from '../hooks/useStartTournamen
 type CardNumber = 1 | 2 | 3;
 type FormPlayer = { name: string; card_number: CardNumber; is_scorekeeper: boolean };
 
+const MIN_PLAYERS = 6;
+const MAX_PLAYERS = 12;
+
 const emptyPlayer = (): FormPlayer => ({
   name: '',
   card_number: 1,
   is_scorekeeper: false,
 });
 
-/** Distribute 12 indexes into three groups of 4 with random card assignments. */
-function shuffleCards(): CardNumber[] {
-  const buckets: CardNumber[] = [
-    1, 1, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-  ];
+const defaultCardCount = (playerCount: number): CardNumber =>
+  Math.min(3, Math.max(1, Math.ceil(playerCount / 4))) as CardNumber;
+
+/** Distribute `playerCount` indexes as evenly as possible across `cardCount` cards. */
+function shuffleCards(playerCount: number, cardCount: CardNumber): CardNumber[] {
+  const buckets: CardNumber[] = [];
+  for (let i = 0; i < playerCount; i++) {
+    buckets.push(((i % cardCount) + 1) as CardNumber);
+  }
   for (let i = buckets.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [buckets[i], buckets[j]] = [buckets[j], buckets[i]];
@@ -34,18 +39,47 @@ export default function Setup() {
   const people = usePeople();
   const startTournament = useStartTournament();
 
+  const [playerCount, setPlayerCount] = useState<number>(MAX_PLAYERS);
+  const [cardCount, setCardCount] = useState<CardNumber>(defaultCardCount(MAX_PLAYERS));
   const [players, setPlayers] = useState<FormPlayer[]>(() =>
-    Array.from({ length: 12 }, emptyPlayer),
+    Array.from({ length: MAX_PLAYERS }, emptyPlayer),
   );
+
+  const activePlayers = players.slice(0, playerCount);
+
+  const changePlayerCount = (next: number) => {
+    const clamped = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, next));
+    setPlayerCount(clamped);
+    // Re-derive a sensible card count, but don't override if the user already
+    // picked something compatible.
+    const suggested = defaultCardCount(clamped);
+    if (suggested !== cardCount) setCardCount(suggested);
+  };
+
+  const changeCardCount = (next: CardNumber) => {
+    setCardCount(next);
+    // Snap any player on a now-unused card down to card 1, and clear their
+    // scorekeeper flag so the user re-picks.
+    setPlayers((prev) =>
+      prev.map((p) =>
+        p.card_number > next
+          ? { ...p, card_number: 1, is_scorekeeper: false }
+          : p,
+      ),
+    );
+  };
 
   const updatePlayer = (idx: number, patch: Partial<FormPlayer>) => {
     setPlayers((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
   };
 
   const handleShuffle = () => {
-    const cards = shuffleCards();
+    const cards = shuffleCards(playerCount, cardCount);
     setPlayers((prev) =>
-      prev.map((p, i) => ({ ...p, card_number: cards[i], is_scorekeeper: false })),
+      prev.map((p, i) => {
+        if (i >= playerCount) return p;
+        return { ...p, card_number: cards[i], is_scorekeeper: false };
+      }),
     );
   };
 
@@ -53,7 +87,6 @@ export default function Setup() {
     setPlayers((prev) =>
       prev.map((p, i) => {
         if (i === idx) return { ...p, is_scorekeeper: !p.is_scorekeeper };
-        // Only one scorekeeper per card — clear others on the same card.
         if (p.card_number === prev[idx].card_number && p.is_scorekeeper) {
           return { ...p, is_scorekeeper: false };
         }
@@ -72,8 +105,7 @@ export default function Setup() {
 
   // --- Validation -----------------------------------------------------------
   const validation = useMemo(() => {
-    const trimmedNames = players.map((p) => p.name.trim());
-
+    const trimmedNames = activePlayers.map((p) => p.name.trim());
     const allFilled = trimmedNames.every((n) => n.length > 0);
 
     const lowered = trimmedNames.map((n) => n.toLowerCase());
@@ -82,28 +114,38 @@ export default function Setup() {
       if (n && lowered.indexOf(n) !== i) dupeNames.add(n);
     });
 
-    const cardCounts: Record<CardNumber, number> = { 1: 0, 2: 0, 3: 0 };
-    const cardScorekeepers: Record<CardNumber, number> = { 1: 0, 2: 0, 3: 0 };
-    players.forEach((p) => {
-      cardCounts[p.card_number]++;
-      if (p.is_scorekeeper) cardScorekeepers[p.card_number]++;
+    const cards = Array.from({ length: cardCount }, (_, i) => (i + 1) as CardNumber);
+    const cardCounts: Record<number, number> = {};
+    const cardScorekeepers: Record<number, number> = {};
+    cards.forEach((c) => {
+      cardCounts[c] = 0;
+      cardScorekeepers[c] = 0;
+    });
+    activePlayers.forEach((p) => {
+      if (p.card_number <= cardCount) {
+        cardCounts[p.card_number]++;
+        if (p.is_scorekeeper) cardScorekeepers[p.card_number]++;
+      }
     });
 
-    const cardsBalanced = ([1, 2, 3] as CardNumber[]).every((c) => cardCounts[c] === 4);
-    const scorekeepersOk = ([1, 2, 3] as CardNumber[]).every(
-      (c) => cardScorekeepers[c] === 1,
-    );
+    const everyCardHasAtLeastOne = cards.every((c) => cardCounts[c] >= 1);
+    const scorekeepersOk = cards.every((c) => cardScorekeepers[c] === 1);
 
     return {
+      cards,
       allFilled,
       duplicateNames: dupeNames,
       cardCounts,
       cardScorekeepers,
-      cardsBalanced,
+      everyCardHasAtLeastOne,
       scorekeepersOk,
-      canSubmit: allFilled && dupeNames.size === 0 && cardsBalanced && scorekeepersOk,
+      canSubmit:
+        allFilled &&
+        dupeNames.size === 0 &&
+        everyCardHasAtLeastOne &&
+        scorekeepersOk,
     };
-  }, [players]);
+  }, [activePlayers, cardCount]);
 
   // --- Submit ---------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,7 +156,7 @@ export default function Setup() {
       (people.data ?? []).map((p) => [p.display_name.trim().toLowerCase(), p.id]),
     );
 
-    const payload: SetupPlayer[] = players.map((p) => {
+    const payload: SetupPlayer[] = activePlayers.map((p) => {
       const trimmed = p.name.trim();
       const existing = peopleByLowerName.get(trimmed.toLowerCase());
       return {
@@ -151,9 +193,21 @@ export default function Setup() {
         </span>
         <h2 className="text-2xl font-semibold tracking-tight">Set up the tournament</h2>
         <p className="text-sm text-slate-400">
-          12 players, 3 cards of 4, 1 scorekeeper per card.
+          Pick the player count and how many cards. Each card needs at least one
+          player and exactly one scorekeeper.
         </p>
       </header>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Counter
+          label="Players"
+          value={playerCount}
+          min={MIN_PLAYERS}
+          max={MAX_PLAYERS}
+          onChange={changePlayerCount}
+        />
+        <CardCountPicker value={cardCount} onChange={changeCardCount} />
+      </div>
 
       <button
         type="button"
@@ -163,7 +217,6 @@ export default function Setup() {
         🎲 Shuffle cards
       </button>
 
-      {/* Autocomplete source — empty in 2026 since no people exist yet. */}
       <datalist id="people-list">
         {(people.data ?? []).map((p) => (
           <option key={p.id} value={p.display_name} />
@@ -171,7 +224,7 @@ export default function Setup() {
       </datalist>
 
       <ol className="flex flex-col gap-2">
-        {players.map((p, idx) => (
+        {activePlayers.map((p, idx) => (
           <li
             key={idx}
             className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"
@@ -194,7 +247,7 @@ export default function Setup() {
 
             <div className="mt-2 flex items-center justify-between gap-2 pl-8">
               <div className="flex gap-1">
-                {([1, 2, 3] as CardNumber[]).map((c) => (
+                {validation.cards.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -230,6 +283,7 @@ export default function Setup() {
       </ol>
 
       <CardSummary
+        cards={validation.cards}
         cardCounts={validation.cardCounts}
         cardScorekeepers={validation.cardScorekeepers}
       />
@@ -251,17 +305,94 @@ export default function Setup() {
   );
 }
 
+function Counter({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wider text-slate-500">{label}</span>
+      <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(value - 1)}
+          disabled={value <= min}
+          className="h-8 w-8 rounded-md bg-slate-800 text-lg text-slate-200 disabled:opacity-40"
+        >
+          −
+        </button>
+        <span className="flex-1 text-center text-lg font-semibold tabular-nums">
+          {value}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          disabled={value >= max}
+          className="h-8 w-8 rounded-md bg-slate-800 text-lg text-slate-200 disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CardCountPicker({
+  value,
+  onChange,
+}: {
+  value: CardNumber;
+  onChange: (v: CardNumber) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wider text-slate-500">Cards</span>
+      <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-1">
+        {([1, 2, 3] as CardNumber[]).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            className={[
+              'h-9 flex-1 rounded-md text-sm font-medium transition-colors',
+              value === c
+                ? 'bg-gold-500 text-slate-950'
+                : 'text-slate-300 active:bg-slate-800',
+            ].join(' ')}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CardSummary({
+  cards,
   cardCounts,
   cardScorekeepers,
 }: {
-  cardCounts: Record<CardNumber, number>;
-  cardScorekeepers: Record<CardNumber, number>;
+  cards: CardNumber[];
+  cardCounts: Record<number, number>;
+  cardScorekeepers: Record<number, number>;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {([1, 2, 3] as CardNumber[]).map((c) => {
-        const ok = cardCounts[c] === 4 && cardScorekeepers[c] === 1;
+    <div
+      className="grid gap-2"
+      style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}
+    >
+      {cards.map((c) => {
+        const ok = cardCounts[c] >= 1 && cardScorekeepers[c] === 1;
         return (
           <div
             key={c}
@@ -273,7 +404,9 @@ function CardSummary({
             ].join(' ')}
           >
             <div className="text-sm font-medium">Card {c}</div>
-            <div>{cardCounts[c]}/4 players</div>
+            <div>
+              {cardCounts[c]} player{cardCounts[c] === 1 ? '' : 's'}
+            </div>
             <div>{cardScorekeepers[c]}/1 scorekeeper</div>
           </div>
         );
