@@ -63,11 +63,21 @@ describe('computeDelta', () => {
     expect(r.computeDelta(outcome())).toBe(-1);
   });
 
-  it('the_caddie_shack: -1 only if par or better', () => {
+  it('the_caddie_shack: -1 only if (primary) par or better', () => {
     const r = rule('the_caddie_shack');
     expect(r.computeDelta(outcome({ strokes: 3, par: 3 }))).toBe(-1); // par
     expect(r.computeDelta(outcome({ strokes: 2, par: 3 }))).toBe(-1); // birdie
     expect(r.computeDelta(outcome({ strokes: 4, par: 3 }))).toBe(0); // bogey
+  });
+
+  it('the_caddie_shack: partnerDeltaSource is "primary" (partner inherits)', () => {
+    const r = rule('the_caddie_shack');
+    expect(r.partnerDeltaSource).toBe('primary');
+  });
+
+  it('going_steady: partnerDeltaSource is default ("self"-equivalent — flat -3 either way)', () => {
+    const r = rule('going_steady');
+    expect(r.partnerDeltaSource).toBeUndefined();
   });
 
   it('putter_sabotage: always 0 (constraint, not modifier)', () => {

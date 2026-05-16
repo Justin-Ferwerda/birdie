@@ -83,6 +83,13 @@ export interface Rule {
    * Used by rules that need lock-in before the hole is played, even if
    * their primary shape isn't 'pre_declared' (e.g. scramble_up). */
   mustDeclare?: boolean;
+  /** For multi_player rules, where each partner's delta comes from.
+   * 'self' (default): each partner's delta computed from their own strokes
+   *   (e.g. going_steady's flat -3 — works either way; pattern still applies)
+   * 'primary': partners inherit the delta computed from the *primary's*
+   *   strokes (caddie_shack: only the primary's par-or-better matters; the
+   *   partner is just along for the ride). */
+  partnerDeltaSource?: 'self' | 'primary';
   computeDelta: (outcome: RuleOutcome) => number;
   eligible: (ctx: EligibilityContext) => boolean;
   notificationText: (activation: RuleActivationLike, players: PlayerLike[]) => string;
@@ -167,13 +174,15 @@ export const RULES: Rule[] = [
   defineRule({
     key: 'the_caddie_shack',
     displayName: 'The Caddie Shack',
-    description: 'Pick a partner from your card. If you both score par or better, both get –1.',
+    description:
+      'Pick a player from your card to caddie for you — they carry your discs and hand you each throw. If YOU score par or better, both of you get –1.',
     emoji: '🎒',
     shape: 'multi_player',
     oneTimePerPlayer: true,
+    partnerDeltaSource: 'primary',
     computeDelta: (o) => (toPar(o) <= 0 ? -1 : 0),
     notificationText: (a, players) =>
-      `${nameOf(a.primary_player_number, players)} ran The Caddie Shack with ${partnerNames(
+      `${nameOf(a.primary_player_number, players)} caddied with ${partnerNames(
         a.partner_player_numbers,
         players,
       )}`,

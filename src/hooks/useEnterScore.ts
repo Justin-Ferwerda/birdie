@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { getRule, type RuleOutcome } from '../config/rules';
+import { getRule, type Rule, type RuleOutcome } from '../config/rules';
 
 export interface RuleActivationInput {
   rule_key: string;
@@ -25,9 +25,34 @@ export interface EnterScoreArgs {
   rule?: RuleActivationInput;
 }
 
+/** Compute a partner's delta from the appropriate source: their own strokes
+ *  (default) or the primary's strokes (caddie_shack-style rules). */
+async function partnerDelta(
+  rule: Rule,
+  partnerOwn: RuleOutcome,
+  tournament_id: string,
+  primaryPlayerNumber: number,
+  hole_id: string,
+): Promise<number> {
+  if ((rule.partnerDeltaSource ?? 'self') === 'self') {
+    return rule.computeDelta(partnerOwn);
+  }
+  // 'primary': look up primary's score; if not entered yet, delta is 0
+  // (and the primary's later save will retroactively patch partner deltas).
+  const { data, error } = await supabase
+    .from('scores')
+    .select('strokes, par_snapshot')
+    .eq('tournament_id', tournament_id)
+    .eq('player_number', primaryPlayerNumber)
+    .eq('hole_id', hole_id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return 0;
+  return rule.computeDelta({ strokes: data.strokes, par: data.par_snapshot });
+}
+
 /** When saving Justin's score, look for activations where Justin was named as
- * a partner by someone else on his card. Used to propagate the partner's
- * delta into Justin's score automatically. */
+ *  a partner by someone else. */
 async function findIncomingPartnerDelta(
   tournament_id: string,
   player_number: number,
@@ -37,7 +62,7 @@ async function findIncomingPartnerDelta(
 ): Promise<number> {
   const { data, error } = await supabase
     .from('rule_activations')
-    .select('rule_key, partner_player_numbers')
+    .select('rule_key, primary_player_number, partner_player_numbers')
     .eq('tournament_id', tournament_id)
     .eq('hole_id', hole_id)
     .not('partner_player_numbers', 'is', null);
@@ -48,8 +73,13 @@ async function findIncomingPartnerDelta(
     if (!partners.includes(player_number)) continue;
     const rule = getRule(row.rule_key);
     if (!rule) continue;
-    const outcome: RuleOutcome = { strokes, par };
-    return rule.computeDelta(outcome);
+    return partnerDelta(
+      rule,
+      { strokes, par },
+      tournament_id,
+      row.primary_player_number,
+      hole_id,
+    );
   }
   return 0;
 }
@@ -96,8 +126,7 @@ async function enterScore(args: EnterScoreArgs) {
     );
   if (sErr) throw sErr;
 
-  // 2. Drop any existing PRIMARY activation for this (player, hole). Partner
-  // activations (where someone else is primary) stay untouched.
+  // 2. Drop any existing PRIMARY activation for this (player, hole).
   const { error: dErr } = await supabase
     .from('rule_activations')
     .delete()
@@ -121,10 +150,7 @@ async function enterScore(args: EnterScoreArgs) {
     });
     if (rErr) throw rErr;
 
-    // 4. If the rule names partners and they already have a score on this
-    // hole, push the partner's delta into their row too. Each partner's
-    // delta is computed from THEIR strokes (caddie_shack: par-or-better
-    // is per player; going_steady: flat -3 for all).
+    // 4. Propagate to any partners who already have scores on this hole.
     if (rule.partner_player_numbers && rule.partner_player_numbers.length > 0) {
       const ruleSpec = getRule(rule.rule_key);
       if (ruleSpec) {
@@ -136,13 +162,16 @@ async function enterScore(args: EnterScoreArgs) {
           .in('player_number', rule.partner_player_numbers);
         if (psErr) throw psErr;
         for (const ps of partnerScores ?? []) {
-          const partnerDelta = ruleSpec.computeDelta({
-            strokes: ps.strokes,
-            par: ps.par_snapshot,
-          });
+          const delta = await partnerDelta(
+            ruleSpec,
+            { strokes: ps.strokes, par: ps.par_snapshot },
+            tournament_id,
+            player_number, // the primary
+            hole_id,
+          );
           const { error: upErr } = await supabase
             .from('scores')
-            .update({ rule_delta: partnerDelta })
+            .update({ rule_delta: delta })
             .eq('tournament_id', tournament_id)
             .eq('player_number', ps.player_number)
             .eq('hole_id', hole_id);
