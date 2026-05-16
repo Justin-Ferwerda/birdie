@@ -196,6 +196,7 @@ function RuleDetailsModal({
     ? holes.find((h) => h.id === activation.hole_id)
     : null;
   const outcomeSuccess = (activation?.outcome as { success?: boolean } | null)?.success;
+  const photoUrl = (activation?.outcome as { photo_url?: string } | null)?.photo_url ?? null;
   const partnerNames = (activation?.partner_player_numbers ?? [])
     .map((n) => allPlayers.find((p) => p.player_number === n)?.display_name ?? `Player ${n}`)
     .join(', ');
@@ -232,51 +233,67 @@ function RuleDetailsModal({
         </div>
 
         {activation ? (
-          <div className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
-            <Field
-              label="Hole"
-              value={
-                holeInfo
-                  ? `${COURSE_LABEL[holeInfo.course_id]} · H${holeInfo.hole_number}`
-                  : '—'
-              }
-            />
-            {outcomeSuccess != null && (
+          <>
+            <div className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
               <Field
-                label="Outcome"
-                value={outcomeSuccess ? '✓ Made it' : '✗ Missed'}
-                valueClass={outcomeSuccess ? 'text-emerald-300' : 'text-rose-300'}
-              />
-            )}
-            {partnerNames && <Field label="Partner" value={partnerNames} />}
-            {targetName && <Field label="Target" value={targetName} />}
-            {activation.delta_applied != null && (
-              <Field
-                label="Delta"
+                label="Hole"
                 value={
-                  activation.delta_applied === 0
-                    ? '—'
-                    : activation.delta_applied > 0
-                      ? `+${activation.delta_applied}`
-                      : `${activation.delta_applied}`
-                }
-                valueClass={
-                  activation.delta_applied < 0
-                    ? 'text-gold-400'
-                    : activation.delta_applied > 0
-                      ? 'text-rose-300'
-                      : 'text-slate-400'
+                  holeInfo
+                    ? `${COURSE_LABEL[holeInfo.course_id]} · H${holeInfo.hole_number}`
+                    : '—'
                 }
               />
+              {outcomeSuccess != null && (
+                <Field
+                  label="Outcome"
+                  value={outcomeSuccess ? '✓ Made it' : '✗ Missed'}
+                  valueClass={outcomeSuccess ? 'text-emerald-300' : 'text-rose-300'}
+                />
+              )}
+              {partnerNames && <Field label="Partner" value={partnerNames} />}
+              {targetName && <Field label="Target" value={targetName} />}
+              {activation.delta_applied != null && (
+                <Field
+                  label="Delta"
+                  value={
+                    activation.delta_applied === 0
+                      ? '—'
+                      : activation.delta_applied > 0
+                        ? `+${activation.delta_applied}`
+                        : `${activation.delta_applied}`
+                  }
+                  valueClass={
+                    activation.delta_applied < 0
+                      ? 'text-gold-400'
+                      : activation.delta_applied > 0
+                        ? 'text-rose-300'
+                        : 'text-slate-400'
+                  }
+                />
+              )}
+              {rule.requiresPhoto && !photoUrl && (
+                <Field
+                  label="Photo"
+                  value="not yet uploaded"
+                  valueClass="text-amber-300"
+                />
+              )}
+            </div>
+            {photoUrl && (
+              <a
+                href={photoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="overflow-hidden rounded-lg border border-slate-800"
+              >
+                <img
+                  src={photoUrl}
+                  alt={`${rule.displayName} proof`}
+                  className="block max-h-72 w-full object-contain bg-black"
+                />
+              </a>
             )}
-            {rule.requiresPhoto && (
-              <Field
-                label="Photo"
-                value="(Phase 13 wires uploads)"
-                valueClass="text-amber-300"
-              />
-            )}
-          </div>
+          </>
         ) : (
           <div className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">
             Not yet used.

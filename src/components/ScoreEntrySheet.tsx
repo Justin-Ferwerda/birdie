@@ -7,6 +7,7 @@ import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import Avatar from './Avatar';
 import RulePicker from './RulePicker';
 import PartnerPicker from './PartnerPicker';
+import PhotoCapture from './PhotoCapture';
 import type { Hole } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 import { getRule, type EligibilityContext, type Rule, type RuleOutcome } from '../config/rules';
@@ -60,6 +61,9 @@ export default function ScoreEntrySheet({
   );
   const [partnerPlayerNumber, setPartnerPlayerNumber] = useState<number | null>(
     currentPartnerPlayerNumbers?.[0] ?? null,
+  );
+  const [photoUrl, setPhotoUrl] = useState<string | null>(
+    (currentRuleOutcome?.photo_url as string | undefined) ?? null,
   );
 
   const enterScore = useEnterScore();
@@ -169,9 +173,7 @@ export default function ScoreEntrySheet({
         rule: selectedRule
           ? {
               rule_key: selectedRule.key,
-              outcome: SUCCESS_RULES.has(selectedRule.key)
-                ? { success: outcomeSuccess }
-                : null,
+              outcome: buildOutcome(selectedRule.key, outcomeSuccess, photoUrl),
               partner_player_numbers:
                 MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) && partnerPlayerNumber != null
                   ? [partnerPlayerNumber]
@@ -193,6 +195,7 @@ export default function ScoreEntrySheet({
       setSelectedRule(null);
       setOutcomeSuccess(null);
       setPartnerPlayerNumber(null);
+      setPhotoUrl(null);
     } else {
       setShowRules(true);
     }
@@ -335,9 +338,14 @@ export default function ScoreEntrySheet({
               )}
 
               {selectedRule?.requiresPhoto && (
-                <p className="text-[11px] text-amber-400/80">
-                  📷 Photo upload comes in Phase 13 — rule applies for now without one.
-                </p>
+                <PhotoCapture
+                  tournament_id={tournament_id}
+                  player_number={player.player_number}
+                  rule_key={selectedRule.key}
+                  currentUrl={photoUrl}
+                  onUploaded={setPhotoUrl}
+                  onClear={() => setPhotoUrl(null)}
+                />
               )}
 
               {selectedRule?.shape === 'whole_card' && (
@@ -395,6 +403,23 @@ export default function ScoreEntrySheet({
       </div>
     </div>
   );
+}
+
+/** Builds the outcome JSON sent with a rule activation, combining the
+ *  success flag (for binary-outcome rules) and an optional photo URL. */
+function buildOutcome(
+  ruleKey: string,
+  success: boolean | null,
+  photoUrl: string | null,
+): Record<string, unknown> | null {
+  const outcome: Record<string, unknown> = {};
+  if (SUCCESS_RULES.has(ruleKey)) {
+    outcome.success = success;
+  }
+  if (photoUrl) {
+    outcome.photo_url = photoUrl;
+  }
+  return Object.keys(outcome).length > 0 ? outcome : null;
 }
 
 function SuccessFailToggle({
