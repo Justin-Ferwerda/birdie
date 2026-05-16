@@ -99,3 +99,16 @@ create table activity_events (
   payload jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Spec: "RLS off (private tournament app, one weekend lifespan)."
+-- Supabase nudges new projects to enable RLS; if it's on without
+-- policies, the anon client gets silent empty results. Disable
+-- explicitly so the anon key works.
+alter table people              disable row level security;
+alter table tournaments         disable row level security;
+alter table courses             disable row level security;
+alter table holes               disable row level security;
+alter table tournament_players  disable row level security;
+alter table scores              disable row level security;
+alter table rule_activations    disable row level security;
+alter table activity_events     disable row level security;
