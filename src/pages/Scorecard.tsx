@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useHoles } from '../hooks/useHoles';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
@@ -34,8 +35,26 @@ export default function Scorecard() {
     [players.data, myPlayerNumber],
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCardFromUrl = (() => {
+    const v = searchParams.get('card');
+    const n = v ? parseInt(v, 10) : NaN;
+    return Number.isFinite(n) && n >= 1 && n <= 3 ? n : null;
+  })();
+
   const [courseId, setCourseId] = useState<CourseId>('seven_oaks');
-  const [cardNumber, setCardNumber] = useState<number | null>(null);
+  const [cardNumber, setCardNumber] = useState<number | null>(initialCardFromUrl);
+
+  // Strip the query param once consumed so subsequent navigations to /scorecard
+  // don't re-snap to that card.
+  useEffect(() => {
+    if (initialCardFromUrl != null && searchParams.has('card')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('card');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [entry, setEntry] = useState<{
     player: TournamentPlayerWithPerson;
     hole: Hole;
