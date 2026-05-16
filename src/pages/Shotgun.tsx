@@ -90,7 +90,7 @@ export default function Shotgun() {
   }
 
   return (
-    <section className="mx-auto flex max-w-md flex-col gap-4 px-4 py-6 pb-32">
+    <section className="mx-auto flex max-w-md flex-col gap-4 px-4 py-6">
       <header className="flex flex-col gap-1">
         <span className="self-start rounded-full bg-slate-800 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-400">
           One-shot · Crockett
@@ -166,38 +166,36 @@ export default function Shotgun() {
         })}
       </ol>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-800 bg-slate-950/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-md flex-col gap-2 px-4 py-3">
-          <div className="text-xs text-slate-400">
-            {participants.size} in
-            {fastest != null && ` · fastest set`}
-            {!canSubmit && (
-              <span className="ml-1 text-slate-500">
-                {participants.size === 0
-                  ? '— pick at least one'
-                  : fastest == null
-                    ? '— pick a fastest'
-                    : ''}
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="rounded-md bg-slate-800 px-3 py-3 text-sm text-slate-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="flex-1 rounded-xl bg-gold-500 px-4 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
-            >
-              {fireShotgun.isPending ? 'Firing…' : 'Lock it in'}
-            </button>
-          </div>
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-3">
+        <div className="text-xs text-slate-400">
+          {participants.size} in
+          {fastest != null && ` · fastest set`}
+          {!canSubmit && (
+            <span className="ml-1 text-slate-500">
+              {participants.size === 0
+                ? '— pick at least one'
+                : fastest == null
+                  ? '— pick a fastest'
+                  : ''}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-md bg-slate-800 px-3 py-3 text-sm text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="flex-1 rounded-xl bg-gold-500 px-4 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
+          >
+            {fireShotgun.isPending ? 'Firing…' : 'Lock it in'}
+          </button>
         </div>
       </div>
     </section>
