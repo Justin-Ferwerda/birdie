@@ -8,7 +8,7 @@ const FILTER_LABEL: Record<Filter, string> = {
   all: 'All',
   birdies: 'Birdies+',
   rules: 'Rules',
-  events: 'Big',
+  events: 'Highlights',
 };
 
 const BIRDIE_PLUS: ReadonlySet<ActivityEventType> = new Set([
