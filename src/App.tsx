@@ -7,14 +7,17 @@ import MyRound from './pages/MyRound';
 import Leaderboard from './pages/Leaderboard';
 import Feed from './pages/Feed';
 import Setup from './pages/Setup';
+import IdentityPicker from './components/IdentityPicker';
 import { useActiveTournament } from './hooks/useActiveTournament';
+import { useMyPlayer } from './hooks/useMyPlayer';
 
 export default function App() {
   const tournament = useActiveTournament();
+  const { playerNumber } = useMyPlayer();
   const location = useLocation();
   const onSetup = location.pathname === '/setup';
 
-  // Setup is full-screen — no top/bottom nav until the tournament is live.
+  // Setup is full-screen — no nav until the tournament is live.
   if (tournament.data && !tournament.data.setup_complete) {
     if (!onSetup) return <Navigate to="/setup" replace />;
     return (
@@ -26,9 +29,20 @@ export default function App() {
     );
   }
 
-  // Setup is done — keep the user out of /setup unless they reset it.
   if (tournament.data?.setup_complete && onSetup) {
     return <Navigate to="/" replace />;
+  }
+
+  // Setup is done but this phone hasn't picked an identity yet.
+  if (tournament.data?.setup_complete && playerNumber == null) {
+    return (
+      <div className="flex h-full flex-col">
+        <TopNav />
+        <main className="flex-1 overflow-y-auto pb-20">
+          <IdentityPicker />
+        </main>
+      </div>
+    );
   }
 
   return (
