@@ -51,11 +51,14 @@ export default function PhotoCapture({
       <div className="text-[11px] uppercase tracking-wider text-slate-500">
         Photo
       </div>
+      {/* No `capture` attribute — iOS Safari has long-standing bugs with
+          the in-line camera (black viewfinder, no shutter). Without it,
+          iOS shows the native sheet with Take Photo / Photo Library /
+          Files; Android shows a similar chooser. */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={onChange}
       />
