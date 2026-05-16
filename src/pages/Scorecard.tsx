@@ -275,6 +275,15 @@ export default function Scorecard() {
                     const sabotage = sabotageByKey.get(
                       `${p.player_number}:${h.id}`,
                     );
+                    // The Classic only gets the 👖 cell badge when failed —
+                    // clearing it is the expected outcome, no shame badge.
+                    const primaryRuleKey =
+                      primary?.rule_key === 'the_classic'
+                        ? (primary.outcome as { success?: boolean } | null)
+                            ?.success === false
+                          ? primary.rule_key
+                          : null
+                        : primary?.rule_key ?? null;
                     return (
                       <ScoreCell
                         key={h.id}
@@ -282,7 +291,7 @@ export default function Scorecard() {
                         hole={h}
                         strokes={score?.strokes ?? null}
                         canEdit={canEdit}
-                        primaryRuleKey={primary?.rule_key ?? null}
+                        primaryRuleKey={primaryRuleKey}
                         incomingRuleKey={incoming?.rule_key ?? null}
                         sabotage={!!sabotage}
                         onTap={() => setEntry({ player: p, hole: h })}
