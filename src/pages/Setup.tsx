@@ -4,9 +4,16 @@ import { toast } from 'sonner';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { usePeople } from '../hooks/usePeople';
 import { useStartTournament, type SetupPlayer } from '../hooks/useStartTournament';
+import Avatar from '../components/Avatar';
+import AvatarPicker from '../components/AvatarPicker';
 
 type CardNumber = 1 | 2 | 3;
-type FormPlayer = { name: string; card_number: CardNumber; is_scorekeeper: boolean };
+type FormPlayer = {
+  name: string;
+  card_number: CardNumber;
+  is_scorekeeper: boolean;
+  avatar_id: string | null;
+};
 
 const MIN_PLAYERS = 6;
 const MAX_PLAYERS = 12;
@@ -15,6 +22,7 @@ const emptyPlayer = (): FormPlayer => ({
   name: '',
   card_number: 1,
   is_scorekeeper: false,
+  avatar_id: null,
 });
 
 const defaultCardCount = (playerCount: number): CardNumber =>
@@ -44,8 +52,19 @@ export default function Setup() {
   const [players, setPlayers] = useState<FormPlayer[]>(() =>
     Array.from({ length: MAX_PLAYERS }, emptyPlayer),
   );
+  const [pickerForIdx, setPickerForIdx] = useState<number | null>(null);
 
   const activePlayers = players.slice(0, playerCount);
+
+  const takenAvatars = useMemo(
+    () =>
+      new Set(
+        activePlayers
+          .map((p) => p.avatar_id)
+          .filter((id): id is string => id != null),
+      ),
+    [activePlayers],
+  );
 
   const changePlayerCount = (next: number) => {
     const clamped = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, next));
@@ -163,6 +182,7 @@ export default function Setup() {
         name: trimmed,
         card_number: p.card_number,
         is_scorekeeper: p.is_scorekeeper,
+        avatar_id: p.avatar_id,
         existing_person_id: existing,
       };
     });
@@ -233,6 +253,14 @@ export default function Setup() {
               <span className="w-6 text-center text-xs font-medium text-slate-500">
                 {idx + 1}
               </span>
+              <button
+                type="button"
+                onClick={() => setPickerForIdx(idx)}
+                className="rounded-full transition-transform active:scale-95"
+                aria-label="Pick avatar"
+              >
+                <Avatar avatarId={p.avatar_id} displayName={p.name} size={40} />
+              </button>
               <input
                 type="text"
                 list="people-list"
@@ -245,7 +273,7 @@ export default function Setup() {
               />
             </div>
 
-            <div className="mt-2 flex items-center justify-between gap-2 pl-8">
+            <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex gap-1">
                 {validation.cards.map((c) => (
                   <button
@@ -301,6 +329,15 @@ export default function Setup() {
       >
         {startTournament.isPending ? 'Starting…' : 'Start Tournament'}
       </button>
+
+      {pickerForIdx !== null && (
+        <AvatarPicker
+          selected={players[pickerForIdx]?.avatar_id ?? null}
+          taken={takenAvatars}
+          onPick={(avatar_id) => updatePlayer(pickerForIdx, { avatar_id })}
+          onClose={() => setPickerForIdx(null)}
+        />
+      )}
     </form>
   );
 }

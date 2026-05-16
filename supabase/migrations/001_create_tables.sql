@@ -7,6 +7,7 @@ create extension if not exists pgcrypto;
 create table people (
   id uuid primary key default gen_random_uuid(),
   display_name text not null,
+  avatar_id text,
   created_at timestamptz not null default now()
 );
 

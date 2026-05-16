@@ -4,6 +4,7 @@
 export interface Person {
   id: string;
   display_name: string;
+  avatar_id: string | null;
   created_at: string;
 }
 

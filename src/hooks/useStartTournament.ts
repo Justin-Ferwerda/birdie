@@ -6,6 +6,7 @@ export interface SetupPlayer {
   name: string;
   card_number: 1 | 2 | 3;
   is_scorekeeper: boolean;
+  avatar_id: string | null;
   /** If the user picked an existing person from the autocomplete, their id. */
   existing_person_id?: string;
 }
@@ -16,26 +17,36 @@ interface StartTournamentArgs {
 }
 
 async function startTournament({ tournament_id, players }: StartTournamentArgs) {
-  if (players.length !== 12) {
-    throw new Error(`Expected 12 players, got ${players.length}`);
-  }
-
-  // 1. Resolve every player to a person_id, creating new rows as needed.
-  const namesNeedingCreation = players
-    .filter((p) => !p.existing_person_id)
-    .map((p) => p.name.trim());
-
+  // 1. Insert new people, carrying their avatar pick.
+  const newPlayers = players.filter((p) => !p.existing_person_id);
   let createdPeople: Person[] = [];
-  if (namesNeedingCreation.length > 0) {
+  if (newPlayers.length > 0) {
     const { data, error } = await supabase
       .from('people')
-      .insert(namesNeedingCreation.map((display_name) => ({ display_name })))
+      .insert(
+        newPlayers.map((p) => ({
+          display_name: p.name.trim(),
+          avatar_id: p.avatar_id,
+        })),
+      )
       .select();
     if (error) throw error;
     createdPeople = (data ?? []) as Person[];
   }
 
-  // Map each player slot to its person_id (existing or newly created).
+  // 2. For existing people whose avatar changed, update.
+  const existingWithAvatar = players.filter(
+    (p) => p.existing_person_id && p.avatar_id != null,
+  );
+  for (const p of existingWithAvatar) {
+    const { error } = await supabase
+      .from('people')
+      .update({ avatar_id: p.avatar_id })
+      .eq('id', p.existing_person_id!);
+    if (error) throw error;
+  }
+
+  // 3. Resolve every slot to its person_id and build the player rows.
   const newPeopleByName = new Map(createdPeople.map((p) => [p.display_name, p.id]));
   const playerRows = players.map((p, idx) => {
     const trimmed = p.name.trim();
@@ -53,11 +64,11 @@ async function startTournament({ tournament_id, players }: StartTournamentArgs) 
     };
   });
 
-  // 2. Insert all 12 tournament_players in one batch.
+  // 4. Insert all tournament_players in one batch.
   const { error: tpError } = await supabase.from('tournament_players').insert(playerRows);
   if (tpError) throw tpError;
 
-  // 3. Mark setup complete.
+  // 5. Flip the gate.
   const { error: tError } = await supabase
     .from('tournaments')
     .update({ setup_complete: true })
