@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { getRule, type Rule, type RuleOutcome } from '../config/rules';
 import { recordScoreEvents } from '../lib/events';
+import { runHoleCompleteDetection, applyGentlemensTeeBonus } from '../lib/detection';
 
 export interface RuleActivationInput {
   rule_key: string;
@@ -232,6 +233,12 @@ async function enterScore(args: EnterScoreArgs) {
     hole_number: args.hole_number,
     course_id: args.course_id,
   });
+
+  // Phase 16: apply Gentlemen's Tee bonus if the whole card finished this
+  // hole bogey-or-better, then check for exclusivity / hardest / easiest.
+  // Bonus first so the hole-complete check sees the updated rule_deltas.
+  await applyGentlemensTeeBonus(tournament_id, hole_id);
+  await runHoleCompleteDetection(tournament_id, hole_id);
 }
 
 export function useEnterScore() {
