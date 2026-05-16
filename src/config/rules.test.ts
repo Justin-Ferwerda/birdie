@@ -196,6 +196,18 @@ describe('eligible — phase gating', () => {
   it('non-pre-declared rules are not eligible in the declare phase', () => {
     expect(rule('the_marshmallow').eligible(ctx({ phase: 'declare' }))).toBe(false);
   });
+
+  it('scramble_up (mustDeclare multi_player) is eligible only in declare phase', () => {
+    const r = rule('scramble_up');
+    expect(r.eligible(ctx({ phase: 'declare' }))).toBe(true);
+    expect(r.eligible(ctx({ phase: 'score_entry' }))).toBe(false);
+  });
+
+  it('the_gentlemens_tee (mustDeclare whole_card) is eligible only in declare phase', () => {
+    const r = rule('the_gentlemens_tee');
+    expect(r.eligible(ctx({ phase: 'declare' }))).toBe(true);
+    expect(r.eligible(ctx({ phase: 'score_entry' }))).toBe(false);
+  });
 });
 
 // --------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import { useRuleActivations } from '../hooks/useRuleActivations';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
 import ScoreEntrySheet from '../components/ScoreEntrySheet';
+import DeclareSheet from '../components/DeclareSheet';
 import { categorize, cellClasses, formatToPar } from '../lib/scoring';
 import { getRule } from '../config/rules';
 import type { CourseId, Hole, RuleActivation, Score } from '../types/database';
@@ -38,11 +39,10 @@ export default function Scorecard() {
     player: TournamentPlayerWithPerson;
     hole: Hole;
   } | null>(null);
+  const [showDeclare, setShowDeclare] = useState(false);
 
-  // Default card_number to my card once players load.
   const activeCard = cardNumber ?? me?.card_number ?? 1;
 
-  // Distinct card numbers in this tournament (1, 1+2, or 1+2+3).
   const cardNumbers = useMemo(() => {
     const set = new Set<number>();
     (players.data ?? []).forEach((p) => set.add(p.card_number));
@@ -59,7 +59,6 @@ export default function Scorecard() {
     [players.data, activeCard],
   );
 
-  // Index scores by (player_number, hole_id) for O(1) lookups.
   const scoresByKey = useMemo(() => {
     const map = new Map<string, Score>();
     (scores.data ?? []).forEach((s) => {
@@ -68,8 +67,8 @@ export default function Scorecard() {
     return map;
   }, [scores.data]);
 
-  // Index rule activations the same way.
-  const ruleActivationByKey = useMemo(() => {
+  // Primary activation by (primary_player_number, hole_id).
+  const primaryActivationByKey = useMemo(() => {
     const map = new Map<string, RuleActivation>();
     (ruleActivations.data ?? []).forEach((a) => {
       if (a.hole_id == null) return;
@@ -78,8 +77,45 @@ export default function Scorecard() {
     return map;
   }, [ruleActivations.data]);
 
+  // Sabotage target lookup: (target_player_number, hole_id) → activation.
+  const sabotageByKey = useMemo(() => {
+    const map = new Map<string, RuleActivation>();
+    (ruleActivations.data ?? []).forEach((a) => {
+      if (a.rule_key !== 'putter_sabotage' || a.hole_id == null) return;
+      if (a.target_player_number == null) return;
+      map.set(`${a.target_player_number}:${a.hole_id}`, a);
+    });
+    return map;
+  }, [ruleActivations.data]);
+
+  // Incoming partner: for each (player, hole), is there an activation where
+  // this player is named as a partner by someone else?
+  const incomingPartnerByKey = useMemo(() => {
+    const map = new Map<string, RuleActivation>();
+    (ruleActivations.data ?? []).forEach((a) => {
+      if (a.hole_id == null || !a.partner_player_numbers) return;
+      a.partner_player_numbers.forEach((pn) => {
+        map.set(`${pn}:${a.hole_id}`, a);
+      });
+    });
+    return map;
+  }, [ruleActivations.data]);
+
   const isMyCard = me?.card_number === activeCard;
   const canEdit = !!me?.is_scorekeeper && isMyCard;
+
+  // Sabotage warnings for the active card (players on this card being targeted).
+  const sabotageWarnings = useMemo(() => {
+    const warnings: { player: TournamentPlayerWithPerson; hole: Hole }[] = [];
+    for (const p of cardPlayers) {
+      for (const h of courseHoles) {
+        if (sabotageByKey.has(`${p.player_number}:${h.id}`)) {
+          warnings.push({ player: p, hole: h });
+        }
+      }
+    }
+    return warnings;
+  }, [cardPlayers, courseHoles, sabotageByKey]);
 
   if (tournament.isLoading || players.isLoading || holes.isLoading) {
     return <CenteredMessage>Loading scorecard…</CenteredMessage>;
@@ -102,6 +138,29 @@ export default function Scorecard() {
             ? 'Read-only — only your card’s scorekeeper can enter scores.'
             : 'Read-only — switch to your own card to enter scores.'}
         </p>
+      )}
+
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => setShowDeclare(true)}
+          className="self-start rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200"
+        >
+          ✏️ Declare a rule
+        </button>
+      )}
+
+      {sabotageWarnings.length > 0 && (
+        <div className="rounded-md border border-rose-800 bg-rose-900/30 px-3 py-2 text-xs">
+          <div className="mb-1 font-semibold text-rose-300">🎯 Sabotage active</div>
+          <ul className="text-rose-200/90">
+            {sabotageWarnings.map((w) => (
+              <li key={`${w.player.player_number}:${w.hole.id}`}>
+                {w.player.display_name} — putter only on H{w.hole.hole_number}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
@@ -134,7 +193,6 @@ export default function Scorecard() {
                 (acc, s) => acc + (s?.strokes ?? 0),
                 0,
               );
-              // Adjusted: raw to-par + rule_delta per hole.
               const totalAdjustedToPar = playerScores.reduce((acc, s, i) => {
                 if (!s) return acc;
                 return acc + (s.strokes - courseHoles[i].par) + (s.rule_delta ?? 0);
@@ -165,12 +223,18 @@ export default function Scorecard() {
                     const strokes = score?.strokes ?? null;
                     const category =
                       strokes != null ? categorize(strokes, h.par) : null;
-                    const activation = ruleActivationByKey.get(
+                    const primary = primaryActivationByKey.get(
                       `${p.player_number}:${h.id}`,
                     );
-                    const ruleEmoji = activation
-                      ? getRule(activation.rule_key)?.emoji
-                      : null;
+                    const incoming = incomingPartnerByKey.get(
+                      `${p.player_number}:${h.id}`,
+                    );
+                    const sabotage = sabotageByKey.get(
+                      `${p.player_number}:${h.id}`,
+                    );
+                    const activeRule =
+                      primary?.rule_key ?? incoming?.rule_key ?? null;
+                    const ruleEmoji = activeRule ? getRule(activeRule)?.emoji : null;
                     return (
                       <td
                         key={h.id}
@@ -192,14 +256,14 @@ export default function Scorecard() {
                         >
                           {strokes ?? '–'}
                         </button>
-                        {ruleEmoji && (
-                          <div
-                            className="mt-0.5 text-[10px] leading-none"
-                            title={getRule(activation!.rule_key)?.displayName}
-                          >
-                            {ruleEmoji}
-                          </div>
-                        )}
+                        <div className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] leading-none">
+                          {ruleEmoji && (
+                            <span title={getRule(activeRule!)?.displayName}>
+                              {ruleEmoji}
+                            </span>
+                          )}
+                          {sabotage && <span title="Putter Sabotage active">🎯</span>}
+                        </div>
                       </td>
                     );
                   })}
@@ -223,25 +287,43 @@ export default function Scorecard() {
       </div>
 
       {entry && tournament.data && me && (() => {
-        const existingScore = scoresByKey.get(
-          `${entry.player.player_number}:${entry.hole.id}`,
-        );
-        const existingActivation = ruleActivationByKey.get(
-          `${entry.player.player_number}:${entry.hole.id}`,
-        );
+        const key = `${entry.player.player_number}:${entry.hole.id}`;
+        const existingScore = scoresByKey.get(key);
+        const primary = primaryActivationByKey.get(key);
+        const incoming = incomingPartnerByKey.get(key);
+        const incomingPrimaryName = incoming
+          ? players.data?.find(
+              (p) => p.player_number === incoming.primary_player_number,
+            )?.display_name ?? null
+          : null;
         return (
           <ScoreEntrySheet
             tournament_id={tournament.data.id}
             player={entry.player}
             hole={entry.hole}
             currentStrokes={existingScore?.strokes ?? null}
-            currentRuleKey={existingActivation?.rule_key ?? null}
-            currentRuleOutcome={existingActivation?.outcome ?? null}
+            currentRuleKey={primary?.rule_key ?? null}
+            currentRuleOutcome={primary?.outcome ?? null}
+            currentPartnerPlayerNumbers={primary?.partner_player_numbers ?? null}
+            incomingPartnerRuleKey={incoming?.rule_key ?? null}
+            incomingPartnerPrimaryName={incomingPrimaryName}
             enteredByPlayerNumber={me.player_number}
             onClose={() => setEntry(null)}
           />
         );
       })()}
+
+      {showDeclare && tournament.data && me && (
+        <DeclareSheet
+          tournament_id={tournament.data.id}
+          primary={me}
+          cardPlayers={cardPlayers}
+          allPlayers={players.data ?? []}
+          courseHoles={courseHoles}
+          courseId={courseId}
+          onClose={() => setShowDeclare(false)}
+        />
+      )}
     </section>
   );
 }

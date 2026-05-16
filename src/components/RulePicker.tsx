@@ -1,9 +1,13 @@
 import { RULES, type EligibilityContext, type Rule, type RuleShape } from '../config/rules';
 
-/** Shapes wired up in Phase 6. Phase 7 adds the rest. */
-const PHASE_6_SHAPES: ReadonlySet<RuleShape> = new Set([
+/** Shapes pickable from inside the score entry sheet.
+ * cross_card_target and pre_declared have their own Declare/Activate flow
+ * on the Scorecard — they don't belong in the per-cell entry sheet. */
+const SCORE_ENTRY_SHAPES: ReadonlySet<RuleShape> = new Set([
   'self_modifier',
   'conditional_modifier',
+  'multi_player',
+  'whole_card',
   'tournament_event',
   'flag_only',
 ]);
@@ -12,10 +16,17 @@ interface RulePickerProps {
   ctx: EligibilityContext;
   selectedKey: string | null;
   onSelect: (rule: Rule | null) => void;
+  /** Override the default shape filter (used by the Declare sheet). */
+  shapes?: ReadonlySet<RuleShape>;
 }
 
-export default function RulePicker({ ctx, selectedKey, onSelect }: RulePickerProps) {
-  const available = RULES.filter((r) => PHASE_6_SHAPES.has(r.shape) && r.eligible(ctx));
+export default function RulePicker({
+  ctx,
+  selectedKey,
+  onSelect,
+  shapes = SCORE_ENTRY_SHAPES,
+}: RulePickerProps) {
+  const available = RULES.filter((r) => shapes.has(r.shape) && r.eligible(ctx));
 
   if (available.length === 0) {
     return (

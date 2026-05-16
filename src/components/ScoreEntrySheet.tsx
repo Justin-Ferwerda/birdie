@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useEnterScore } from '../hooks/useEnterScore';
 import { useRuleActivations } from '../hooks/useRuleActivations';
+import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import Avatar from './Avatar';
 import RulePicker from './RulePicker';
+import PartnerPicker from './PartnerPicker';
 import type { Hole } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 import { getRule, type EligibilityContext, type Rule, type RuleOutcome } from '../config/rules';
@@ -14,9 +16,13 @@ interface ScoreEntrySheetProps {
   player: TournamentPlayerWithPerson;
   hole: Hole;
   currentStrokes: number | null;
-  /** Existing rule on this score, if any (so we can preselect on re-edit). */
+  /** Rule already saved on this player's score for this hole, if any. */
   currentRuleKey: string | null;
   currentRuleOutcome: Record<string, unknown> | null;
+  currentPartnerPlayerNumbers: number[] | null;
+  /** Rule someone ELSE picked that names this player as a partner. */
+  incomingPartnerRuleKey: string | null;
+  incomingPartnerPrimaryName: string | null;
   enteredByPlayerNumber: number;
   onClose: () => void;
 }
@@ -28,6 +34,8 @@ const SUCCESS_RULES = new Set([
   'let_the_record_show',
 ]);
 
+const MULTI_PLAYER_NEEDS_PARTNER = new Set(['the_caddie_shack', 'going_steady']);
+
 export default function ScoreEntrySheet({
   tournament_id,
   player,
@@ -35,6 +43,9 @@ export default function ScoreEntrySheet({
   currentStrokes,
   currentRuleKey,
   currentRuleOutcome,
+  currentPartnerPlayerNumbers,
+  incomingPartnerRuleKey,
+  incomingPartnerPrimaryName,
   enteredByPlayerNumber,
   onClose,
 }: ScoreEntrySheetProps) {
@@ -46,9 +57,13 @@ export default function ScoreEntrySheet({
   const [outcomeSuccess, setOutcomeSuccess] = useState<boolean | null>(
     (currentRuleOutcome?.success as boolean | undefined) ?? null,
   );
+  const [partnerPlayerNumber, setPartnerPlayerNumber] = useState<number | null>(
+    currentPartnerPlayerNumbers?.[0] ?? null,
+  );
 
   const enterScore = useEnterScore();
   const ruleActivations = useRuleActivations();
+  const players = useTournamentPlayers();
 
   // Rules this player has already burned. Don't show them as available again.
   const usedRuleKeys = useMemo(
@@ -58,7 +73,7 @@ export default function ScoreEntrySheet({
           .filter(
             (a) =>
               a.primary_player_number === player.player_number &&
-              a.rule_key !== currentRuleKey, // editing the same rule shouldn't lock it
+              a.rule_key !== currentRuleKey,
           )
           .map((a) => a.rule_key),
       ),
@@ -102,14 +117,37 @@ export default function ScoreEntrySheet({
     [strokes, hole.par, outcomeSuccess],
   );
 
-  const ruleDelta = selectedRule ? selectedRule.computeDelta(ruleOutcome) : 0;
+  // Rule that will actually be applied: either the explicit pick OR the
+  // incoming partner rule (someone else committed this player as a partner).
+  const effectiveRule: Rule | null = useMemo(() => {
+    if (selectedRule) return selectedRule;
+    if (incomingPartnerRuleKey) return getRule(incomingPartnerRuleKey) ?? null;
+    return null;
+  }, [selectedRule, incomingPartnerRuleKey]);
+
+  const ruleDelta = effectiveRule ? effectiveRule.computeDelta(ruleOutcome) : 0;
   const baseToPar = strokes - hole.par;
   const adjustedToPar = baseToPar + ruleDelta;
 
   const needsSuccessChoice =
     selectedRule != null && SUCCESS_RULES.has(selectedRule.key) && outcomeSuccess == null;
+  const needsPartner =
+    selectedRule != null &&
+    MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) &&
+    partnerPlayerNumber == null;
 
-  const canSave = !needsSuccessChoice;
+  const canSave = !needsSuccessChoice && !needsPartner;
+
+  // Card-mates we can offer as partners.
+  const cardMates = useMemo(
+    () =>
+      (players.data ?? []).filter(
+        (p) =>
+          p.card_number === player.card_number &&
+          p.player_number !== player.player_number,
+      ),
+    [players.data, player.card_number, player.player_number],
+  );
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -128,6 +166,10 @@ export default function ScoreEntrySheet({
               outcome: SUCCESS_RULES.has(selectedRule.key)
                 ? { success: outcomeSuccess }
                 : null,
+              partner_player_numbers:
+                MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) && partnerPlayerNumber != null
+                  ? [partnerPlayerNumber]
+                  : null,
             }
           : undefined,
       });
@@ -141,10 +183,10 @@ export default function ScoreEntrySheet({
 
   const toggleRulesSection = () => {
     if (showRules) {
-      // Turning off the toggle clears any selection.
       setShowRules(false);
       setSelectedRule(null);
       setOutcomeSuccess(null);
+      setPartnerPlayerNumber(null);
     } else {
       setShowRules(true);
     }
@@ -213,7 +255,21 @@ export default function ScoreEntrySheet({
           </button>
         </div>
 
-        {/* Rule section */}
+        {/* Inbound partner rule — someone else committed this player. */}
+        {incomingPartnerRuleKey && (
+          <div className="rounded-xl border border-gold-500/40 bg-gold-500/10 p-3 text-xs">
+            <div className="font-semibold text-gold-300">
+              {getRule(incomingPartnerRuleKey)?.emoji}{' '}
+              {getRule(incomingPartnerRuleKey)?.displayName} (incoming)
+            </div>
+            <div className="text-slate-300">
+              {incomingPartnerPrimaryName ?? 'A partner'} committed you to this rule.
+              The delta is applied automatically.
+            </div>
+          </div>
+        )}
+
+        {/* Rule section — picking your own rule */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
           <button
             type="button"
@@ -236,6 +292,7 @@ export default function ScoreEntrySheet({
                 onSelect={(r) => {
                   setSelectedRule(r);
                   setOutcomeSuccess(null);
+                  setPartnerPlayerNumber(null);
                 }}
               />
 
@@ -247,9 +304,26 @@ export default function ScoreEntrySheet({
                 />
               )}
 
+              {selectedRule && MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) && (
+                <PartnerPicker
+                  candidates={cardMates}
+                  selectedPlayerNumber={partnerPlayerNumber}
+                  onChange={setPartnerPlayerNumber}
+                  label={`Partner for ${selectedRule.displayName}`}
+                />
+              )}
+
               {selectedRule?.requiresPhoto && (
                 <p className="text-[11px] text-amber-400/80">
                   📷 Photo upload comes in Phase 13 — rule applies for now without one.
+                </p>
+              )}
+
+              {selectedRule?.shape === 'whole_card' && (
+                <p className="text-[11px] text-amber-400/80">
+                  This rule's delta applies to the entire card. Cross-row math
+                  for {selectedRule.displayName} lands with Phase 16 hole-complete
+                  detection.
                 </p>
               )}
             </div>
@@ -263,7 +337,7 @@ export default function ScoreEntrySheet({
           baseToPar={baseToPar}
           ruleDelta={ruleDelta}
           adjustedToPar={adjustedToPar}
-          rule={selectedRule}
+          rule={effectiveRule}
         />
 
         <button
@@ -276,7 +350,9 @@ export default function ScoreEntrySheet({
             ? 'Saving…'
             : needsSuccessChoice
               ? `Pick outcome for ${selectedRule?.displayName}`
-              : 'Save'}
+              : needsPartner
+                ? `Pick partner for ${selectedRule?.displayName}`
+                : 'Save'}
         </button>
       </div>
     </div>

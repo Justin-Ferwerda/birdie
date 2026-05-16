@@ -79,6 +79,10 @@ export interface Rule {
   requiresPhoto?: boolean;
   parThreeOnly?: boolean;
   oneTimePerPlayer: boolean;
+  /** Must be declared in the 'declare' phase rather than at score entry.
+   * Used by rules that need lock-in before the hole is played, even if
+   * their primary shape isn't 'pre_declared' (e.g. scramble_up). */
+  mustDeclare?: boolean;
   computeDelta: (outcome: RuleOutcome) => number;
   eligible: (ctx: EligibilityContext) => boolean;
   notificationText: (activation: RuleActivationLike, players: PlayerLike[]) => string;
@@ -125,11 +129,12 @@ function defineRule(spec: RuleSpec): Rule {
       if (ctx.ruleAppliedThisHole && ctx.ruleAppliedThisHole !== spec.key) {
         return false;
       }
-      // Pre-declared rules can only be picked during the declare phase.
-      // Everything else is picked during score entry. (Pre-declared rules
-      // are reconciled at score entry by the UI, not by re-running eligible.)
-      if (spec.shape === 'pre_declared' && ctx.phase !== 'declare') return false;
-      if (spec.shape !== 'pre_declared' && ctx.phase === 'declare') return false;
+      // Rules that must be declared can only appear in the declare phase.
+      // Includes shape='pre_declared' (e.g. birdie_for_shurdy) AND any other
+      // shape with mustDeclare:true (e.g. scramble_up, gentlemens_tee).
+      const mustDeclare = spec.mustDeclare || spec.shape === 'pre_declared';
+      if (mustDeclare && ctx.phase !== 'declare') return false;
+      if (!mustDeclare && ctx.phase === 'declare') return false;
       return customEligible ? customEligible(ctx) : true;
     },
   };
@@ -239,6 +244,7 @@ export const RULES: Rule[] = [
       'Whole card commits to standstill throws. If everyone scores bogey or better, all get –1.',
     emoji: '🎩',
     shape: 'whole_card',
+    mustDeclare: true,
     oneTimePerPlayer: true,
     computeDelta: (o) => {
       if (!o.cardScoresToPar?.length) return 0;
@@ -289,6 +295,7 @@ export const RULES: Rule[] = [
       'Pick a card partner. You both throw every shot from the best lie. Announce before driving.',
     emoji: '🔀',
     shape: 'multi_player',
+    mustDeclare: true,
     oneTimePerPlayer: true,
     computeDelta: () => 0,
     notificationText: (a, players) =>
