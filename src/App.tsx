@@ -8,6 +8,7 @@ import Leaderboard from './pages/Leaderboard';
 import Feed from './pages/Feed';
 import Setup from './pages/Setup';
 import IdentityPicker from './components/IdentityPicker';
+import RealtimeListener from './components/RealtimeListener';
 import { useActiveTournament } from './hooks/useActiveTournament';
 import { useMyPlayer } from './hooks/useMyPlayer';
 
@@ -47,6 +48,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      <RealtimeListener />
       <TopNav />
       <main className="flex-1 overflow-y-auto pb-20">
         <Routes>

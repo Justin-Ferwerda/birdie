@@ -160,6 +160,9 @@ export default function ScoreEntrySheet({
         par_snapshot: hole.par,
         rule_delta: ruleDelta,
         entered_by_player_number: enteredByPlayerNumber,
+        player_display_name: player.display_name,
+        hole_number: hole.hole_number,
+        course_id: hole.course_id,
         rule: selectedRule
           ? {
               rule_key: selectedRule.key,

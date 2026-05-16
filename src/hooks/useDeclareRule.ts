@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { getRule } from '../config/rules';
+import { recordDeclareEvents } from '../lib/events';
 
 export interface DeclareRuleArgs {
   tournament_id: string;
@@ -9,16 +11,13 @@ export interface DeclareRuleArgs {
   card_number?: number | null;
   partner_player_numbers?: number[] | null;
   target_player_number?: number | null;
+  /** Optional display metadata for the activity feed. */
+  primary_display_name?: string;
+  target_display_name?: string;
+  hole_number?: number;
+  course_id?: string;
 }
 
-/** Writes a rule_activation with no score-linked outcome. Used by:
- *  - Pre-declared rules (birdie_for_shurdy, scramble_up, gentlemens_tee)
- *  - Cross-card sabotage (putter_sabotage)
- *  - Whole-card non-mustDeclare (play_through_parade)
- *
- * No score row is touched here — the declaration is the side effect.
- * Outcome / delta_applied get filled in later, either by the player's
- * score entry (for primary-owned activations) or by Phase 16 detection. */
 async function declareRule(args: DeclareRuleArgs) {
   const { error } = await supabase.from('rule_activations').insert({
     tournament_id: args.tournament_id,
@@ -32,6 +31,22 @@ async function declareRule(args: DeclareRuleArgs) {
     delta_applied: null,
   });
   if (error) throw error;
+
+  const rule = getRule(args.rule_key);
+  await recordDeclareEvents({
+    tournament_id: args.tournament_id,
+    rule_key: args.rule_key,
+    rule_emoji: rule?.emoji ?? null,
+    rule_display_name: rule?.displayName ?? null,
+    primary_player_number: args.primary_player_number,
+    primary_display_name: args.primary_display_name,
+    target_player_number: args.target_player_number,
+    target_display_name: args.target_display_name,
+    hole_id: args.hole_id,
+    hole_number: args.hole_number,
+    course_id: args.course_id,
+    card_number: args.card_number,
+  });
 }
 
 export function useDeclareRule() {
@@ -40,6 +55,7 @@ export function useDeclareRule() {
     mutationFn: declareRule,
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['rule-activations', vars.tournament_id] });
+      qc.invalidateQueries({ queryKey: ['activity-events', vars.tournament_id] });
     },
   });
 }

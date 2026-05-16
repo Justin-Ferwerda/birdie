@@ -112,6 +112,10 @@ export default function DeclareSheet({
 
   const handleSave = async () => {
     if (!canSave || !hole) return;
+    const targetPlayer =
+      targetNumber != null
+        ? allPlayers.find((p) => p.player_number === targetNumber)
+        : null;
     try {
       await declare.mutateAsync({
         tournament_id,
@@ -125,6 +129,10 @@ export default function DeclareSheet({
         partner_player_numbers:
           partnerNumber != null ? [partnerNumber] : null,
         target_player_number: targetNumber,
+        primary_display_name: primary.display_name,
+        target_display_name: targetPlayer?.display_name,
+        hole_number: hole.hole_number,
+        course_id: hole.course_id,
       });
       toast.success(
         `Declared ${selectedRule.displayName} for hole ${hole.hole_number}`,
