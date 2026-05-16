@@ -161,11 +161,11 @@ export default function Scorecard() {
                           disabled={!canEdit}
                           onClick={() => setEntry({ player: p, hole: h })}
                           className={[
-                            'flex h-8 w-8 items-center justify-center rounded-md text-sm tabular-nums transition-colors',
+                            'flex h-8 w-8 items-center justify-center text-sm tabular-nums transition-colors',
                             strokes != null
                               ? cellClasses(category!)
-                              : 'text-slate-700',
-                            canEdit && 'active:bg-slate-800',
+                              : 'rounded-md text-slate-700',
+                            canEdit && strokes == null && 'active:bg-slate-800',
                           ]
                             .filter(Boolean)
                             .join(' ')}
