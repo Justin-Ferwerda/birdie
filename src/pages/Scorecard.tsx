@@ -187,7 +187,7 @@ export default function Scorecard() {
         <table className="border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-slate-900 px-2 py-2 text-left text-[10px] uppercase tracking-wider text-slate-500">
+              <th className="sticky left-0 z-10 w-32 min-w-32 bg-slate-900 px-2 py-2 text-left text-[10px] uppercase tracking-wider text-slate-500">
                 Player
               </th>
               {courseHoles.map((h) => (
@@ -227,16 +227,16 @@ export default function Scorecard() {
               ).length;
               return (
                 <tr key={p.player_number} className="border-t border-slate-800">
-                  <th className="sticky left-0 z-10 bg-slate-900 px-2 py-1.5 text-left">
-                    <div className="flex items-center gap-2">
+                  <th className="sticky left-0 z-10 w-32 min-w-32 bg-slate-900 px-2 py-1.5 text-left align-top">
+                    <div className="flex items-start gap-2">
                       <Avatar
                         avatarId={p.person?.avatar_id}
                         displayName={p.display_name}
                         size={28}
                       />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span className="truncate text-xs font-medium text-slate-100">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+                          <span className="text-xs font-medium leading-tight text-slate-100">
                             {p.display_name}
                           </span>
                           {aceCount > 0 && (
