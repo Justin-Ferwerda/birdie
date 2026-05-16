@@ -209,7 +209,8 @@ export const RULES: Rule[] = [
   defineRule({
     key: 'the_dui',
     displayName: 'The DUI',
-    description: 'Take a designated shot from the tee. Par or better → –2; worse → 0.',
+    description:
+      'Spin in a circle 7 times, then immediately drive from the tee. Par or better → –2; worse → 0.',
     emoji: '🍻',
     shape: 'conditional_modifier',
     oneTimePerPlayer: true,
