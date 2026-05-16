@@ -47,6 +47,28 @@ interface SmokeTestState<T> {
   data: T | undefined;
 }
 
+function formatError(err: unknown): string {
+  if (err == null) return '';
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object') {
+    // Supabase errors are plain objects: { message, code, details, hint }
+    const e = err as Record<string, unknown>;
+    const parts = [
+      e.message && `message: ${String(e.message)}`,
+      e.code && `code: ${String(e.code)}`,
+      e.details && `details: ${String(e.details)}`,
+      e.hint && `hint: ${String(e.hint)}`,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join('\n');
+    try {
+      return JSON.stringify(err, null, 2);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
 function SmokeTest<T>({
   label,
   state,
@@ -61,9 +83,9 @@ function SmokeTest<T>({
       <div className="mb-1 text-[11px] uppercase tracking-wider text-slate-500">{label}</div>
       {state.isLoading && <p className="text-sm text-slate-400">Loading…</p>}
       {state.error != null && (
-        <p className="text-sm text-rose-400">
-          Error: {state.error instanceof Error ? state.error.message : String(state.error)}
-        </p>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-rose-400">
+          {formatError(state.error)}
+        </pre>
       )}
       {state.data != null && <div className="text-sm">{children(state.data)}</div>}
     </div>
