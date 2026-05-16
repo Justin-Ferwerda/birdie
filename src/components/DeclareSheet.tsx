@@ -9,6 +9,7 @@ import {
 } from '../config/rules';
 import { useDeclareRule } from '../hooks/useDeclareRule';
 import { useRuleActivations } from '../hooks/useRuleActivations';
+import { useScores } from '../hooks/useScores';
 import Avatar from './Avatar';
 import PartnerPicker from './PartnerPicker';
 import type { Hole, CourseId } from '../types/database';
@@ -19,19 +20,15 @@ const DECLARE_SHAPES: ReadonlySet<RuleShape> = new Set([
   'pre_declared',
   'cross_card_target',
   'whole_card',
-  'multi_player', // scramble_up (mustDeclare); other multi_player rules are filtered out by phase
+  'multi_player', // scramble_up (mustDeclare); others filter out by phase
 ]);
 
 interface DeclareSheetProps {
   tournament_id: string;
-  /** The player doing the declaring (typically the scorekeeper of this card). */
   primary: TournamentPlayerWithPerson;
   cardPlayers: TournamentPlayerWithPerson[];
-  /** Used for cross-card sabotage target picker. */
   allPlayers: TournamentPlayerWithPerson[];
-  /** Holes on the active course, in play order. */
   courseHoles: Hole[];
-  /** Default target course (the one currently focused on Scorecard). */
   courseId: CourseId;
   onClose: () => void;
 }
@@ -47,16 +44,13 @@ export default function DeclareSheet({
 }: DeclareSheetProps) {
   const declare = useDeclareRule();
   const activations = useRuleActivations();
+  const scores = useScores();
 
-  // Choose the hole this declaration applies to. Default: next unscored
-  // hole on the active course for this player (we don't have score state
-  // here; default to hole 1 and let the user adjust).
   const [holeId, setHoleId] = useState<string>(courseHoles[0]?.id ?? '');
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [partnerNumber, setPartnerNumber] = useState<number | null>(null);
   const [targetNumber, setTargetNumber] = useState<number | null>(null);
 
-  // Lock body scroll.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -75,7 +69,6 @@ export default function DeclareSheet({
     [courseHoles, holeId],
   );
 
-  // What this primary has already used.
   const usedRuleKeys = useMemo(
     () =>
       new Set(
@@ -99,16 +92,61 @@ export default function DeclareSheet({
     );
   }, [eligibilityCtx]);
 
+  // Players whose scores would disqualify a hole for this declaration.
+  // - pre_declared (birdie_for_shurdy): primary
+  // - multi_player + mustDeclare (scramble_up): primary + partner
+  // - whole_card (gentlemens_tee / play_through_parade): everyone on the card
+  // - cross_card_target (putter_sabotage): the target only
+  const relevantPlayerNumbers = useMemo<number[]>(() => {
+    if (!selectedRule) return [];
+    if (selectedRule.shape === 'cross_card_target') {
+      return targetNumber != null ? [targetNumber] : [];
+    }
+    const nums = new Set<number>();
+    nums.add(primary.player_number);
+    if (selectedRule.key === 'scramble_up' && partnerNumber != null) {
+      nums.add(partnerNumber);
+    }
+    if (selectedRule.shape === 'whole_card') {
+      cardPlayers.forEach((p) => nums.add(p.player_number));
+    }
+    return Array.from(nums);
+  }, [selectedRule, partnerNumber, targetNumber, primary.player_number, cardPlayers]);
+
+  // Hole IDs where at least one relevant player has already scored on this course.
+  const blockedHoleIds = useMemo(() => {
+    if (relevantPlayerNumbers.length === 0) return new Set<string>();
+    return new Set(
+      (scores.data ?? [])
+        .filter((s) => relevantPlayerNumbers.includes(s.player_number))
+        .map((s) => s.hole_id),
+    );
+  }, [scores.data, relevantPlayerNumbers]);
+
+  // If the user already picked a hole that just became blocked (because they
+  // selected a target / partner), bump them to the first available hole.
+  useEffect(() => {
+    if (!blockedHoleIds.has(holeId)) return;
+    const next = courseHoles.find((h) => !blockedHoleIds.has(h.id));
+    setHoleId(next?.id ?? '');
+  }, [blockedHoleIds, holeId, courseHoles]);
+
+  const holeBlocked = blockedHoleIds.has(holeId);
   const needsPartner =
     selectedRule != null &&
-    (selectedRule.key === 'scramble_up') &&
+    selectedRule.key === 'scramble_up' &&
     partnerNumber == null;
   const needsTarget =
     selectedRule != null &&
     selectedRule.shape === 'cross_card_target' &&
     targetNumber == null;
 
-  const canSave = selectedRule != null && hole != null && !needsPartner && !needsTarget;
+  const canSave =
+    selectedRule != null &&
+    hole != null &&
+    !holeBlocked &&
+    !needsPartner &&
+    !needsTarget;
 
   const handleSave = async () => {
     if (!canSave || !hole) return;
@@ -144,13 +182,11 @@ export default function DeclareSheet({
     }
   };
 
-  // Cross-card candidates: everyone NOT on the primary's card.
   const targetCandidates = useMemo(
     () => allPlayers.filter((p) => p.card_number !== primary.card_number),
     [allPlayers, primary.card_number],
   );
 
-  // Card-mates for partner picks.
   const cardMates = useMemo(
     () =>
       cardPlayers.filter((p) => p.player_number !== primary.player_number),
@@ -194,26 +230,41 @@ export default function DeclareSheet({
             For hole
           </div>
           <div className="flex gap-1 overflow-x-auto pb-1">
-            {courseHoles.map((h) => (
-              <button
-                key={h.id}
-                type="button"
-                onClick={() => setHoleId(h.id)}
-                className={[
-                  'flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md text-xs',
-                  holeId === h.id
-                    ? 'bg-gold-500 text-slate-950 font-semibold'
-                    : 'bg-slate-800 text-slate-300',
-                ].join(' ')}
-              >
-                <div className="leading-none">{h.hole_number}</div>
-                <div className="text-[9px] leading-none opacity-70">P{h.par}</div>
-              </button>
-            ))}
+            {courseHoles.map((h) => {
+              const blocked = blockedHoleIds.has(h.id);
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  disabled={blocked}
+                  onClick={() => setHoleId(h.id)}
+                  className={[
+                    'flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors',
+                    blocked
+                      ? 'bg-slate-900 text-slate-700 line-through'
+                      : holeId === h.id
+                        ? 'bg-gold-500 text-slate-950 font-semibold'
+                        : 'bg-slate-800 text-slate-300',
+                  ].join(' ')}
+                  title={blocked ? 'A relevant player has already scored this hole' : undefined}
+                >
+                  <div className="leading-none">{h.hole_number}</div>
+                  <div className="text-[9px] leading-none opacity-70">P{h.par}</div>
+                </button>
+              );
+            })}
           </div>
+          {selectedRule && blockedHoleIds.size > 0 && (
+            <div className="text-[11px] text-slate-500">
+              Greyed-out holes have already been scored by{' '}
+              {selectedRule.shape === 'cross_card_target'
+                ? 'the target'
+                : 'a relevant player'}
+              .
+            </div>
+          )}
         </div>
 
-        {/* Rule grid */}
         <div className="flex flex-col gap-1.5">
           <div className="text-[11px] uppercase tracking-wider text-slate-500">
             Rule
@@ -299,7 +350,9 @@ export default function DeclareSheet({
                 ? `Pick partner for ${selectedRule.displayName}`
                 : needsTarget
                   ? `Pick target for ${selectedRule.displayName}`
-                  : `Declare ${selectedRule.displayName} for H${hole?.hole_number}`}
+                  : holeBlocked
+                    ? 'Pick an unscored hole'
+                    : `Declare ${selectedRule.displayName} for H${hole?.hole_number}`}
         </button>
       </div>
     </div>
