@@ -227,6 +227,7 @@ async function enterScore(args: EnterScoreArgs) {
     rule_key: rule?.rule_key ?? null,
     rule_emoji: ruleSpec?.emoji ?? null,
     rule_display_name: ruleSpec?.displayName ?? null,
+    rule_outcome: rule?.outcome ?? null,
     player_display_name: args.player_display_name,
     hole_number: args.hole_number,
     course_id: args.course_id,

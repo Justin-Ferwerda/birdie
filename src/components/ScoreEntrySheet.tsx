@@ -53,10 +53,23 @@ export default function ScoreEntrySheet({
   enteredByPlayerNumber,
   onClose,
 }: ScoreEntrySheetProps) {
+  const isClassicHole = hole.course_id === 'seven_oaks' && hole.hole_number === 6;
+  const initialClassicCleared: boolean | null =
+    currentRuleKey === 'the_classic'
+      ? ((currentRuleOutcome?.success as boolean | undefined) ?? null)
+      : null;
+
   const [strokes, setStrokes] = useState<number>(currentStrokes ?? hole.par);
-  const [showRules, setShowRules] = useState<boolean>(!!currentRuleKey);
+  const [classicCleared, setClassicCleared] = useState<boolean | null>(
+    initialClassicCleared,
+  );
+  const [showRules, setShowRules] = useState<boolean>(
+    !!currentRuleKey && currentRuleKey !== 'the_classic',
+  );
   const [selectedRule, setSelectedRule] = useState<Rule | null>(
-    currentRuleKey ? getRule(currentRuleKey) ?? null : null,
+    currentRuleKey && currentRuleKey !== 'the_classic'
+      ? getRule(currentRuleKey) ?? null
+      : null,
   );
   const [outcomeSuccess, setOutcomeSuccess] = useState<boolean | null>(
     (currentRuleOutcome?.success as boolean | undefined) ?? null,
@@ -144,8 +157,9 @@ export default function ScoreEntrySheet({
     selectedRule != null &&
     MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) &&
     partnerPlayerNumber == null;
+  const needsClassicAnswer = isClassicHole && classicCleared == null;
 
-  const canSave = !needsSuccessChoice && !needsPartner;
+  const canSave = !needsSuccessChoice && !needsPartner && !needsClassicAnswer;
 
   // Card-mates we can offer as partners.
   const cardMates = useMemo(
@@ -160,6 +174,26 @@ export default function ScoreEntrySheet({
 
   const handleSave = async () => {
     if (!canSave) return;
+    // On Seven Oaks H6, The Classic activation always wins the rule slot;
+    // a user-picked rule on this hole wouldn't be reachable anyway since
+    // the picker is suppressed there.
+    const ruleToSave = isClassicHole
+      ? {
+          rule_key: 'the_classic',
+          outcome: { success: classicCleared } as Record<string, unknown>,
+          partner_player_numbers: null,
+        }
+      : selectedRule
+        ? {
+            rule_key: selectedRule.key,
+            outcome: buildOutcome(selectedRule.key, outcomeSuccess, photoUrl),
+            partner_player_numbers:
+              MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) && partnerPlayerNumber != null
+                ? [partnerPlayerNumber]
+                : null,
+          }
+        : undefined;
+
     try {
       await enterScore.mutateAsync({
         tournament_id,
@@ -172,16 +206,7 @@ export default function ScoreEntrySheet({
         player_display_name: player.display_name,
         hole_number: hole.hole_number,
         course_id: hole.course_id,
-        rule: selectedRule
-          ? {
-              rule_key: selectedRule.key,
-              outcome: buildOutcome(selectedRule.key, outcomeSuccess, photoUrl),
-              partner_player_numbers:
-                MULTI_PLAYER_NEEDS_PARTNER.has(selectedRule.key) && partnerPlayerNumber != null
-                  ? [partnerPlayerNumber]
-                  : null,
-            }
-          : undefined,
+        rule: ruleToSave,
       });
       toast.success(`Saved ${player.display_name}: ${strokes} on H${hole.hole_number}`);
       onClose();
@@ -295,7 +320,17 @@ export default function ScoreEntrySheet({
           </div>
         )}
 
+        {/* The Classic — auto-prompt on Seven Oaks H6, replaces the
+            regular rule picker */}
+        {isClassicHole && (
+          <ClassicPrompt
+            value={classicCleared}
+            onChange={setClassicCleared}
+          />
+        )}
+
         {/* Rule section — picking your own rule */}
+        {!isClassicHole && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
           <button
             type="button"
@@ -357,6 +392,7 @@ export default function ScoreEntrySheet({
             </div>
           )}
         </div>
+        )}
 
         {/* Live preview */}
         <PreviewBar
@@ -376,11 +412,13 @@ export default function ScoreEntrySheet({
         >
           {enterScore.isPending
             ? 'Saving…'
-            : needsSuccessChoice
-              ? `Pick outcome for ${selectedRule?.displayName}`
-              : needsPartner
-                ? `Pick partner for ${selectedRule?.displayName}`
-                : 'Save'}
+            : needsClassicAnswer
+              ? 'Answer The Classic to save'
+              : needsSuccessChoice
+                ? `Pick outcome for ${selectedRule?.displayName}`
+                : needsPartner
+                  ? `Pick partner for ${selectedRule?.displayName}`
+                  : 'Save'}
         </button>
 
         {currentStrokes != null && (
@@ -399,6 +437,51 @@ export default function ScoreEntrySheet({
                 : 'Clear score'}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ClassicPrompt({
+  value,
+  onChange,
+}: {
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="rounded-xl border-2 border-amber-600/70 bg-amber-900/20 p-3">
+      <div className="text-sm font-semibold text-amber-200">
+        👖 The Classic — required
+      </div>
+      <p className="mt-1 text-xs text-slate-300">
+        Did you clear the amateur pad?
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={[
+            'rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+            value === true
+              ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300'
+              : 'border-slate-700 bg-slate-900 text-slate-300 active:bg-slate-800',
+          ].join(' ')}
+        >
+          ✓ Cleared
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={[
+            'rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+            value === false
+              ? 'border-rose-500 bg-rose-500/15 text-rose-300'
+              : 'border-slate-700 bg-slate-900 text-slate-300 active:bg-slate-800',
+          ].join(' ')}
+        >
+          👖 Failed
+        </button>
       </div>
     </div>
   );

@@ -26,7 +26,11 @@ export default function RulePicker({
   onSelect,
   shapes = SCORE_ENTRY_SHAPES,
 }: RulePickerProps) {
-  const available = RULES.filter((r) => shapes.has(r.shape) && r.eligible(ctx));
+  // The Classic has its own auto-prompt on Seven Oaks H6 (Phase 15) —
+  // don't surface it in the generic picker.
+  const available = RULES.filter(
+    (r) => r.key !== 'the_classic' && shapes.has(r.shape) && r.eligible(ctx),
+  );
 
   if (available.length === 0) {
     return (

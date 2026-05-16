@@ -14,6 +14,10 @@ interface ScorePayload {
   rule_key?: string | null;
   rule_emoji?: string | null;
   rule_display_name?: string | null;
+  /** Some rules surface a separate, more specific event (e.g.
+   *  the_classic fires classic_failed instead of rule_activation
+   *  when the player didn't clear). */
+  rule_outcome?: Record<string, unknown> | null;
   /** Filled-in display name so the feed can render without joining. */
   player_display_name?: string | null;
   hole_number?: number | null;
@@ -46,8 +50,8 @@ function eventTypeForScore(strokes: number, par: number): ActivityEventType | nu
   }
 }
 
-/** Wipe prior score-quality + rule_activation events for this (player, hole)
- *  so re-saves don't pile up duplicates. */
+/** Wipe prior score-quality + rule_activation + classic_failed events for
+ *  this (player, hole) so re-saves don't pile up duplicates. */
 async function clearPriorEvents(p: ScorePayload) {
   const { error } = await supabase
     .from('activity_events')
@@ -55,7 +59,7 @@ async function clearPriorEvents(p: ScorePayload) {
     .eq('tournament_id', p.tournament_id)
     .eq('player_number', p.player_number)
     .eq('hole_id', p.hole_id)
-    .in('event_type', Array.from(SCORE_QUALITY_EVENTS));
+    .in('event_type', [...Array.from(SCORE_QUALITY_EVENTS), 'classic_failed']);
   if (error) throw error;
 }
 
@@ -91,20 +95,39 @@ export async function recordScoreEvents(p: ScorePayload) {
   }
 
   if (p.rule_key) {
-    rows.push({
-      tournament_id: p.tournament_id,
-      event_type: 'rule_activation',
-      player_number: p.player_number,
-      hole_id: p.hole_id,
-      payload: {
-        rule_key: p.rule_key,
-        rule_emoji: p.rule_emoji,
-        rule_display_name: p.rule_display_name,
-        player_display_name: p.player_display_name,
-        hole_number: p.hole_number,
-        course_id: p.course_id,
-      },
-    });
+    // The Classic gets its own classic_failed event on failure and
+    // emits nothing on success — never the generic rule_activation event.
+    if (p.rule_key === 'the_classic') {
+      const cleared = (p.rule_outcome as { success?: boolean } | null)?.success;
+      if (cleared === false) {
+        rows.push({
+          tournament_id: p.tournament_id,
+          event_type: 'classic_failed',
+          player_number: p.player_number,
+          hole_id: p.hole_id,
+          payload: {
+            player_display_name: p.player_display_name,
+            hole_number: p.hole_number,
+            course_id: p.course_id,
+          },
+        });
+      }
+    } else {
+      rows.push({
+        tournament_id: p.tournament_id,
+        event_type: 'rule_activation',
+        player_number: p.player_number,
+        hole_id: p.hole_id,
+        payload: {
+          rule_key: p.rule_key,
+          rule_emoji: p.rule_emoji,
+          rule_display_name: p.rule_display_name,
+          player_display_name: p.player_display_name,
+          hole_number: p.hole_number,
+          course_id: p.course_id,
+        },
+      });
+    }
   }
 
   if (rows.length === 0) return;
