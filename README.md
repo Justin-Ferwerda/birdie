@@ -35,8 +35,24 @@ Vite prints both a `Local` and a `Network` URL. Use the Network URL to open the 
 ## Supabase setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. **Project Settings → API** — copy the `Project URL` and `anon public` key into your local `.env`.
-3. Schema + seed are added in Phase 2. SQL files will live in `supabase/migrations/` and `supabase/seed.sql`. Run them by pasting into the Supabase **SQL Editor** in order.
+2. **Project Settings → API** — copy the `Project URL` and `anon public` key into your local `.env`. Also paste them into Netlify under **Site Settings → Environment Variables**.
+3. Open the **SQL Editor** and run the migrations *in order*:
+   1. `supabase/migrations/001_create_tables.sql` — creates `people`, `tournaments`, `courses`, `holes`, `tournament_players`, `scores`, `rule_activations`, `activity_events`.
+   2. `supabase/migrations/002_create_indexes.sql` — query indexes plus the partial unique index that prevents duplicate exclusivity/hardest/easiest events.
+   3. `supabase/migrations/003_seed_courses_and_holes.sql` — seeds the 3 courses, all 54 holes, and inserts the 2026 tournament row with `is_active = true`.
+4. RLS is intentionally **off** for this private, one-weekend app. The anon key is the only auth in play; the spec accepts that tradeoff.
+
+### Reset before tournament day
+
+Paste `supabase/reset.sql` into the SQL Editor. Truncates play data, preserves courses/holes/the 2026 tournament row, and clears `setup_complete`. App boots back into the Setup screen.
+
+### Re-seed reference data
+
+If you ever need to re-seed courses + holes (e.g. after a hole correction), paste `supabase/seed.sql` — it's idempotent.
+
+### Schema deviation from the spec
+
+`scores` stores a `par_snapshot` column (denormalized from `holes.par`) so the `hole_score_to_par` and `adjusted_score_to_par` generated columns are valid IMMUTABLE expressions. Postgres disallows subqueries in `GENERATED ALWAYS AS`, so the spec's exact SQL won't compile. Par never changes mid-tournament, so the denormalization is safe. The client supplies `par_snapshot` on insert.
 
 ---
 
@@ -83,7 +99,7 @@ birdie/
 │   ├── main.tsx           App entry, providers
 │   └── index.css          Tailwind directives
 ├── public/
-├── supabase/              (Phase 2+) migrations + seed SQL
+├── supabase/              migrations + seed + reset SQL
 ├── index.html
 ├── package.json
 ├── vite.config.ts
@@ -100,4 +116,4 @@ birdie/
 
 ## Implementation phases
 
-See the full spec for the 18-phase build plan. Current status: **Phase 1 scaffold complete.**
+See the full spec for the 18-phase build plan. Current status: **Phase 2 Supabase setup complete.** The Home page renders a smoke test for the active tournament + hole count.
