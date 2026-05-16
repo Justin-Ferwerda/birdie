@@ -184,11 +184,17 @@ describe('eligible — common gates', () => {
 
   it('rejects par-3-only rules on a par-4 hole', () => {
     const r = rule('putter_sabotage');
-    expect(r.eligible(ctx({ hole: { ...baseHole, par: 4 } }))).toBe(false);
+    expect(
+      r.eligible(ctx({ hole: { ...baseHole, par: 4 }, phase: 'declare' })),
+    ).toBe(false);
   });
 
-  it('accepts par-3-only rules on a par-3 hole', () => {
-    expect(rule('putter_sabotage').eligible(ctx())).toBe(true);
+  it('accepts par-3-only rules on a par-3 hole (declare phase)', () => {
+    expect(rule('putter_sabotage').eligible(ctx({ phase: 'declare' }))).toBe(true);
+  });
+
+  it('rejects putter_sabotage at score entry (mustDeclare)', () => {
+    expect(rule('putter_sabotage').eligible(ctx())).toBe(false);
   });
 });
 

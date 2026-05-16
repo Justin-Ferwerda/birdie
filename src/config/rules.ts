@@ -196,6 +196,7 @@ export const RULES: Rule[] = [
     emoji: '🎯',
     shape: 'cross_card_target',
     parThreeOnly: true,
+    mustDeclare: true,
     oneTimePerPlayer: true,
     computeDelta: () => 0,
     notificationText: (a, players) =>
