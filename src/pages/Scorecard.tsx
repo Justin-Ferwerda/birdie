@@ -12,6 +12,7 @@ import DeclareSheet from '../components/DeclareSheet';
 import { categorize, cellClasses, formatToPar } from '../lib/scoring';
 import { getRule } from '../config/rules';
 import { useCellPulse } from '../lib/celebrate';
+import { computeTeeOrder } from '../lib/teeOrder';
 import type { CourseId, Hole, RuleActivation, Score } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 
@@ -78,6 +79,46 @@ export default function Scorecard() {
     () => (players.data ?? []).filter((p) => p.card_number === activeCard),
     [players.data, activeCard],
   );
+
+  // Next-hole tee order for the active card on the active course.
+  // "Next hole" = lowest hole_number where at least one card player has
+  // not yet scored. Null when the whole card has finished the course.
+  const teeOrderInfo = useMemo(() => {
+    if (cardPlayers.length === 0 || courseHoles.length === 0) return null;
+    const cardPlayerNumbers = cardPlayers.map((p) => p.player_number).sort((a, b) => a - b);
+    const holeIds = courseHoles.map((h) => h.id);
+    const cardScores = (scores.data ?? []).filter((s) =>
+      cardPlayerNumbers.includes(s.player_number),
+    );
+
+    let nextHoleIndex = -1;
+    for (let i = 0; i < courseHoles.length; i++) {
+      const someoneMissing = cardPlayerNumbers.some(
+        (pn) =>
+          !cardScores.find(
+            (s) => s.player_number === pn && s.hole_id === courseHoles[i].id,
+          ),
+      );
+      if (someoneMissing) {
+        nextHoleIndex = i;
+        break;
+      }
+    }
+    if (nextHoleIndex === -1) return null;
+
+    const order = computeTeeOrder({
+      cardPlayerNumbers,
+      holeIds,
+      scores: cardScores,
+      holeIndex: nextHoleIndex,
+    });
+    return {
+      hole: courseHoles[nextHoleIndex],
+      order: order
+        .map((pn) => cardPlayers.find((p) => p.player_number === pn))
+        .filter((p): p is TournamentPlayerWithPerson => !!p),
+    };
+  }, [cardPlayers, courseHoles, scores.data]);
 
   const scoresByKey = useMemo(() => {
     const map = new Map<string, Score>();
@@ -180,6 +221,32 @@ export default function Scorecard() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {teeOrderInfo && (
+        <div className="rounded-md border border-slate-800 bg-slate-900/60 px-3 py-2">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">
+            Tee order · H{teeOrderInfo.hole.hole_number}
+          </div>
+          <ol className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            {teeOrderInfo.order.map((p, i) => (
+              <li
+                key={p.player_number}
+                className="flex items-center gap-1.5"
+              >
+                <span className="w-4 text-center text-[10px] font-semibold text-slate-500">
+                  {i + 1}.
+                </span>
+                <Avatar
+                  avatarId={p.person?.avatar_id}
+                  displayName={p.display_name}
+                  size={20}
+                />
+                <span className="text-slate-200">{p.display_name}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
