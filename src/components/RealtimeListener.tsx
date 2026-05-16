@@ -6,6 +6,7 @@ import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import PutterSabotageTakeover from './PutterSabotageTakeover';
 import { celebrate } from '../lib/celebrate';
+import { triggerRuleAnimation } from '../lib/ruleAnimations';
 import type { ActivityEvent } from '../types/database';
 
 type EventPayload = {
@@ -138,6 +139,8 @@ function handleEvent(
         `${p.rule_emoji ?? '•'} ${name} — ${p.rule_display_name ?? 'a rule'}${holeSuffix}`,
         { duration: 4000 },
       );
+      if (p.rule_key === 'full_moon') triggerRuleAnimation('full_moon');
+      if (p.rule_key === 'the_marshmallow') triggerRuleAnimation('marshmallow');
       break;
     case 'shotgun_event': {
       const fastest =
@@ -146,6 +149,7 @@ function handleEvent(
         duration: 6000,
         className: 'text-base font-bold',
       });
+      triggerRuleAnimation('shotgun', { fastest_name: fastest });
       break;
     }
     case 'classic_failed':

@@ -62,3 +62,84 @@ body {
     animation: none;
   }
 }
+
+/* --- Per-rule animations (Phase 17) -------------------------------------- */
+
+/* DUI: spin the picker card 7 times in 1.4s when selected. */
+@keyframes rule-dui-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(2520deg); }
+}
+.animate-rule-dui { animation: rule-dui-spin 1.4s linear 1; }
+
+/* Let the Record Show: typewriter effect on the description. */
+@keyframes rule-typewriter {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+.animate-rule-typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: rule-typewriter 800ms steps(40, end) 1;
+}
+
+/* Full Moon: diagonal rise from bottom-left to top-right. */
+@keyframes rule-fullmoon-rise {
+  0%   { transform: translate(-15vw, 110vh) scale(0.7); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(115vw, -20vh) scale(1.6); opacity: 0; }
+}
+.animate-rule-fullmoon { animation: rule-fullmoon-rise 1500ms ease-out 1; }
+
+/* Marshmallow: vertical bounce + drift. Each sprite gets a different
+   --rule-mm-x for spread and --rule-mm-delay for staggered start. */
+@keyframes rule-mm-bounce {
+  0%   { transform: translateY(110vh) scale(0.6); opacity: 0; }
+  20%  { opacity: 1; }
+  40%  { transform: translateY(30vh) scale(1.1); }
+  60%  { transform: translateY(50vh) scale(0.95); }
+  80%  { transform: translateY(40vh) scale(1); }
+  100% { transform: translateY(110vh) scale(0.6); opacity: 0; }
+}
+.animate-rule-marshmallow {
+  animation: rule-mm-bounce 1200ms ease-in-out 1;
+  animation-delay: var(--rule-mm-delay, 0ms);
+}
+
+/* Shotgun: two mugs come in and meet center, foam wipe sweeps across. */
+@keyframes rule-shotgun-mug-left {
+  0%   { transform: translateX(-120vw) rotate(-20deg); opacity: 0; }
+  30%  { transform: translateX(-10vw) rotate(-12deg); opacity: 1; }
+  50%, 60% { transform: translateX(-2vw) rotate(-8deg); opacity: 1; }
+  100% { transform: translateX(-30vw) rotate(-20deg); opacity: 0; }
+}
+@keyframes rule-shotgun-mug-right {
+  0%   { transform: translateX(120vw) rotate(20deg); opacity: 0; }
+  30%  { transform: translateX(10vw) rotate(12deg); opacity: 1; }
+  50%, 60% { transform: translateX(2vw) rotate(8deg); opacity: 1; }
+  100% { transform: translateX(30vw) rotate(20deg); opacity: 0; }
+}
+.animate-rule-shotgun-mug-left  { animation: rule-shotgun-mug-left 1800ms ease-in-out 1; }
+.animate-rule-shotgun-mug-right { animation: rule-shotgun-mug-right 1800ms ease-in-out 1; }
+
+@keyframes rule-shotgun-name {
+  0%, 50% { opacity: 0; transform: translateY(20px) scale(0.85); }
+  65%     { opacity: 1; transform: translateY(0) scale(1); }
+  90%     { opacity: 1; transform: translateY(0) scale(1); }
+  100%    { opacity: 0; transform: translateY(-10px) scale(0.95); }
+}
+.animate-rule-shotgun-name { animation: rule-shotgun-name 1800ms ease-out 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rule-dui,
+  .animate-rule-typewriter,
+  .animate-rule-fullmoon,
+  .animate-rule-marshmallow,
+  .animate-rule-shotgun-mug-left,
+  .animate-rule-shotgun-mug-right,
+  .animate-rule-shotgun-name {
+    animation: none;
+  }
+}

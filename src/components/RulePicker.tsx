@@ -44,6 +44,11 @@ export default function RulePicker({
     <div className="grid grid-cols-2 gap-2">
       {available.map((r) => {
         const isSelected = r.key === selectedKey;
+        // Phase 17 picker-time animations
+        const spinClass =
+          isSelected && r.key === 'the_dui' ? 'animate-rule-dui' : '';
+        const typewriter =
+          isSelected && r.key === 'let_the_record_show';
         return (
           <button
             key={r.key}
@@ -51,10 +56,13 @@ export default function RulePicker({
             onClick={() => onSelect(isSelected ? null : r)}
             className={[
               'flex flex-col items-start gap-1 rounded-lg border p-2 text-left transition-colors',
+              spinClass,
               isSelected
                 ? 'border-gold-500 bg-gold-500/10'
                 : 'border-slate-800 bg-slate-900/60 active:bg-slate-800',
-            ].join(' ')}
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
             <div className="flex w-full items-center gap-1.5">
               <span aria-hidden className="text-base leading-none">
@@ -65,16 +73,22 @@ export default function RulePicker({
               </span>
               {r.requiresPhoto && (
                 <span
-                  title="Photo required (Phase 13 wires uploads)"
+                  title="Photo required (post-MVP — bring witnesses)"
                   className="text-[9px] uppercase tracking-wider text-slate-500"
                 >
                   📷
                 </span>
               )}
             </div>
-            <p className="text-[11px] leading-snug text-slate-400">
-              {r.description}
-            </p>
+            {typewriter ? (
+              <span className="animate-rule-typewriter text-[11px] leading-snug text-slate-300">
+                {r.description}
+              </span>
+            ) : (
+              <p className="text-[11px] leading-snug text-slate-400">
+                {r.description}
+              </p>
+            )}
           </button>
         );
       })}
