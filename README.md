@@ -116,4 +116,28 @@ birdie/
 
 ## Implementation phases
 
-See the full spec for the 18-phase build plan. Current status: **Phase 2 Supabase setup complete.** The Home page renders a smoke test for the active tournament + hole count.
+See the full spec for the 18-phase build plan. **All 18 phases complete** for the 2026 build.
+
+Photo uploads (Phase 13) are intentionally hidden behind a "post-MVP" placeholder — iOS Safari's camera was unreliable in testing. The Supabase Storage bucket, upload helper, and wallet display code are still in place; flipping the import in `src/components/ScoreEntrySheet.tsx` re-enables.
+
+## Pre-tournament smoke test checklist
+
+Walk through this on a real phone the night before:
+
+1. **Setup** — go through the Setup screen with the actual 6–12 player names, avatars, card assignments, and one scorekeeper per card. Hit Start.
+2. **Identity picker** — confirm Switch player flow.
+3. **Score entry** — enter a few scores including:
+   - A birdie, eagle, ace → confetti + cell pulse + toast on a second phone
+   - A double bogey → red toast
+   - A score with a self-modifier rule (Marshmallow) → success/fail toggle, gold preview
+   - A score with a conditional rule (DUI) → strokes drive the delta
+   - A score with a multi-player rule (Caddie Shack) → partner picker, partner delta propagates
+4. **Declare flow** — declare Birdie for Shurdy + Scramble Up + Gentlemen's Tee + Putter Sabotage.
+5. **Putter Sabotage** — target gets a full-screen red takeover.
+6. **The Shotgun** — fires once Crockett has any score; auto-applies on each participant's next Crockett hole.
+7. **The Classic** — auto-prompts on Seven Oaks H6 + Cedar Hill H10; 👖 badge only shows on failures.
+8. **Leaderboard** — sorts by adjusted to-par with tied positions; 🎒 chip opens that player's wallet.
+9. **My Round** — per-course breakdown, vs-field-avg, rules used, exclusivity highlights.
+10. **Feed** — all four filter chips work; shimmer on birdie/eagle/ace entries.
+11. **Offline** — toggle airplane mode; TopNav dot turns red.
+12. **PWA** — Add to Home Screen → relaunch from icon; address bar hidden.

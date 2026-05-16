@@ -5,6 +5,7 @@ import { useScores } from '../hooks/useScores';
 import { useHoles } from '../hooks/useHoles';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
+import InstallHint from '../components/InstallHint';
 
 export default function Home() {
   const tournament = useActiveTournament();
@@ -61,9 +62,7 @@ export default function Home() {
         </Link>
       )}
 
-      <p className="text-xs text-slate-500">
-        Leaderboard, feed, and per-round stats fill in as later phases ship.
-      </p>
+      <InstallHint />
 
       {me && (
         <button

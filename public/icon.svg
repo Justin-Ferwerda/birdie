@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Birdie for Shurdy">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <!-- Disc -->
+  <circle cx="256" cy="256" r="158" fill="#d4af37" stroke="#a3851f" stroke-width="10"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#0f172a" stroke-width="6" stroke-opacity="0.4"/>
+  <circle cx="256" cy="256" r="78" fill="none" stroke="#0f172a" stroke-width="6" stroke-opacity="0.3"/>
+  <!-- Bird letter B -->
+  <text x="256" y="306" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="180" font-weight="900" fill="#0f172a">B</text>
+</svg>
