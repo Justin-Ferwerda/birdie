@@ -116,9 +116,24 @@ birdie/
 
 ## Implementation phases
 
-See the full spec for the 18-phase build plan. **All 18 phases complete** for the 2026 build.
+See the full spec for the 18-phase build plan. **All 18 phases complete** for the 2026 build. The Minigames addendum (M1–M7) ships on top.
 
 Photo uploads (Phase 13) are intentionally hidden behind a "post-MVP" placeholder — iOS Safari's camera was unreliable in testing. The Supabase Storage bucket, upload helper, and wallet display code are still in place; flipping the import in `src/components/ScoreEntrySheet.tsx` re-enables.
+
+## Minigames feature
+
+Sunday-afternoon parallel competition (6 placement-based games: 3/2/1 pts for 1st/2nd/3rd).
+
+- **Schema:** `supabase/migrations/009_create_minigames.sql` (creates `minigames` + `minigame_placements`, seeds 6 games for the active tournament, adds the realtime + champion-uniqueness indexes).
+- **Reset:** `supabase/reset_minigames.sql` clears placements + minigame events for the active tournament; leaves game definitions in place.
+- **UI:** New "Minigames" tab on the Scorecard. Tap any medal slot to assign / clear via a player picker. No scorekeeper restriction.
+- **Leaderboard:** Top-level toggle between "Main Tournament" and "Minigames". Trophy 🏆 shows next to current leader(s) — on both views.
+- **Champion:** Once all 18 placements are filled and one player has a unique highest total, a `minigame_champion` event fires with a full-screen celebration. Re-firing on edit is by design when the leader changes; identical-state edits don't replay.
+
+Pre-tournament smoke for Minigames:
+- Run `009_create_minigames.sql`. Verify `select * from minigames` returns 6 rows.
+- Open the Minigames tab on two phones. Assign a 1st place on phone A — gold toast + cell update fires on phone B within ~1s.
+- Fill all 18 placements; champion celebration fires on every phone simultaneously. 🏆 appears next to that player on the Main Tournament leaderboard.
 
 ## Pre-tournament smoke test checklist
 

@@ -66,6 +66,7 @@ export default function RealtimeListener() {
           qc.invalidateQueries({ queryKey: ['scores', tournament_id] });
           qc.invalidateQueries({ queryKey: ['rule-activations', tournament_id] });
           qc.invalidateQueries({ queryKey: ['activity-events', tournament_id] });
+          qc.invalidateQueries({ queryKey: ['minigame-placements', tournament_id] });
         },
       )
       .subscribe();
@@ -75,7 +76,7 @@ export default function RealtimeListener() {
     };
   }, [tournament_id, playerNumber, qc]);
 
-  // Also push-update the scorecard when someone else writes a score directly.
+  // Push-update the scorecard when someone else writes a score directly.
   useEffect(() => {
     if (!tournament_id) return;
     const channel = supabase
@@ -90,6 +91,32 @@ export default function RealtimeListener() {
         },
         () => {
           qc.invalidateQueries({ queryKey: ['scores', tournament_id] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tournament_id, qc]);
+
+  // Same treatment for minigame placements — when one phone records a
+  // placement, every other phone's Minigames list refreshes immediately.
+  useEffect(() => {
+    if (!tournament_id) return;
+    const channel = supabase
+      .channel(`minigame-placements:${tournament_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'minigame_placements',
+          filter: `tournament_id=eq.${tournament_id}`,
+        },
+        () => {
+          qc.invalidateQueries({
+            queryKey: ['minigame-placements', tournament_id],
+          });
         },
       )
       .subscribe();
