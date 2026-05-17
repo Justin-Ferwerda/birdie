@@ -72,19 +72,22 @@ export default function PlacementModal({
 
   const handleConfirm = async () => {
     if (!canConfirm || selected == null) return;
+    const name =
+      players.data?.find((p) => p.player_number === selected)?.display_name ??
+      `Player ${selected}`;
     try {
       await setPlacement.mutateAsync({
         tournament_id,
         minigame_id: minigame.id,
+        minigame_display_name: minigame.display_name,
         place,
         player_number: selected,
+        player_display_name: name,
         recorded_by_player_number: myPlayerNumber ?? undefined,
       });
-      const name =
-        players.data?.find((p) => p.player_number === selected)?.display_name ??
-        `Player ${selected}`;
-      toast.success(`${meta.medal} ${name} — ${meta.label}, ${minigame.display_name}`);
       onClose();
+      // Realtime listener fires the toast on every phone — no local toast
+      // here to avoid double-firing for the player who hit Confirm.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(`Could not save: ${msg}`);
@@ -96,6 +99,7 @@ export default function PlacementModal({
       await setPlacement.mutateAsync({
         tournament_id,
         minigame_id: minigame.id,
+        minigame_display_name: minigame.display_name,
         place,
         player_number: null,
         recorded_by_player_number: myPlayerNumber ?? undefined,

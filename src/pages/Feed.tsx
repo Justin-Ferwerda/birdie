@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { useActivityEvents } from '../hooks/useActivityEvents';
 import type { ActivityEvent, ActivityEventType } from '../types/database';
 
-type Filter = 'all' | 'birdies' | 'rules' | 'events';
+type Filter = 'all' | 'birdies' | 'rules' | 'events' | 'minigames';
 
 const FILTER_LABEL: Record<Filter, string> = {
   all: 'All',
   birdies: 'Birdies+',
   rules: 'Rules',
   events: 'Highlights',
+  minigames: 'Minigames',
 };
 
 const BIRDIE_PLUS: ReadonlySet<ActivityEventType> = new Set([
@@ -29,6 +30,13 @@ const BIG_EVENTS: ReadonlySet<ActivityEventType> = new Set([
   'exclusive_ace',
   'exclusive_eagle',
   'exclusive_birdie',
+  'minigame_champion',
+]);
+
+const MINIGAME_EVENTS: ReadonlySet<ActivityEventType> = new Set([
+  'minigame_first_place',
+  'minigame_podium',
+  'minigame_champion',
 ]);
 
 function matches(event: ActivityEvent, filter: Filter): boolean {
@@ -36,6 +44,7 @@ function matches(event: ActivityEvent, filter: Filter): boolean {
   if (filter === 'birdies') return BIRDIE_PLUS.has(event.event_type);
   if (filter === 'rules') return event.event_type === 'rule_activation';
   if (filter === 'events') return BIG_EVENTS.has(event.event_type);
+  if (filter === 'minigames') return MINIGAME_EVENTS.has(event.event_type);
   return false;
 }
 
@@ -157,6 +166,25 @@ function FeedEntry({ event }: { event: ActivityEvent }) {
       icon = '🎯';
       text = `${(p.primary_display_name as string | undefined) ?? 'Someone'} sabotaged ${(p.target_display_name as string | undefined) ?? name}${holeSuffix}`;
       break;
+    case 'minigame_first_place': {
+      const game = (p.minigame_display_name as string | undefined) ?? 'a minigame';
+      const pts = (p.points as number | undefined) ?? 3;
+      icon = '🥇';
+      text = `${name} won ${game} (+${pts} pts)`;
+      break;
+    }
+    case 'minigame_podium': {
+      const game = (p.minigame_display_name as string | undefined) ?? 'a minigame';
+      const place = (p.place as number | undefined) ?? 2;
+      const pts = (p.points as number | undefined) ?? 4 - place;
+      icon = place === 2 ? '🥈' : '🥉';
+      text = `${name} took ${place === 2 ? '2nd' : '3rd'} in ${game} (+${pts} pt${pts === 1 ? '' : 's'})`;
+      break;
+    }
+    case 'minigame_champion':
+      icon = '🏆';
+      text = `${name} is the MINIGAMES CHAMPION 🏆`;
+      break;
   }
 
   return (
@@ -191,6 +219,12 @@ function accentForType(type: ActivityEventType): string {
       return 'border-gold-400 bg-gold-500/15 text-gold-200 animate-shimmer';
     case 'putter_sabotage_target':
       return 'border-rose-700 bg-rose-900/30 text-rose-200';
+    case 'minigame_first_place':
+      return 'border-gold-500 bg-gold-500/15 text-gold-200 animate-shimmer';
+    case 'minigame_podium':
+      return 'border-slate-700 bg-slate-900/60 text-slate-200';
+    case 'minigame_champion':
+      return 'border-gold-400 bg-gold-500/20 text-gold-100 animate-shimmer';
     default:
       return 'border-slate-800 bg-slate-900/60 text-slate-200';
   }

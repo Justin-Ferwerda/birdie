@@ -135,6 +135,59 @@ export async function recordScoreEvents(p: ScorePayload) {
   if (error) throw error;
 }
 
+/** Minigame placement events. Mirrors the current state of
+ *  minigame_placements: cleans up any prior events for slots that
+ *  changed, then inserts a fresh event for the new placement (if any).
+ *  Champion event handling lives in M6 (detection.ts). */
+export async function recordPlacementEvents(args: {
+  tournament_id: string;
+  minigame_id: string;
+  minigame_display_name?: string;
+  /** Places whose events should be cleared first (e.g. the slot being
+   *  reassigned, plus the slot the player previously held in this game). */
+  places_to_clear: number[];
+  /** When set, an insert for the new placement; otherwise no insert. */
+  insert?: {
+    place: number;
+    player_number: number;
+    player_display_name?: string;
+  };
+}) {
+  // Delete any prior placement events for the slots we're touching.
+  for (const place of args.places_to_clear) {
+    const event_type =
+      place === 1 ? 'minigame_first_place' : 'minigame_podium';
+    const { error } = await supabase
+      .from('activity_events')
+      .delete()
+      .eq('tournament_id', args.tournament_id)
+      .eq('event_type', event_type)
+      .filter('payload->>minigame_id', 'eq', args.minigame_id)
+      .filter('payload->>place', 'eq', String(place));
+    if (error) throw error;
+  }
+
+  if (args.insert) {
+    const { place, player_number, player_display_name } = args.insert;
+    const event_type =
+      place === 1 ? 'minigame_first_place' : 'minigame_podium';
+    const { error } = await supabase.from('activity_events').insert({
+      tournament_id: args.tournament_id,
+      event_type,
+      player_number,
+      hole_id: null,
+      payload: {
+        minigame_id: args.minigame_id,
+        minigame_display_name: args.minigame_display_name,
+        place,
+        points: 4 - place,
+        player_display_name,
+      },
+    });
+    if (error) throw error;
+  }
+}
+
 /** For declarations / cross-card sabotage triggered outside of score entry. */
 export async function recordDeclareEvents(args: {
   tournament_id: string;

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useActiveTournament } from '../hooks/useActiveTournament';
 import { useMyPlayer } from '../hooks/useMyPlayer';
+import confetti from 'canvas-confetti';
 import PutterSabotageTakeover from './PutterSabotageTakeover';
 import { celebrate } from '../lib/celebrate';
 import { triggerRuleAnimation } from '../lib/ruleAnimations';
@@ -19,6 +20,11 @@ type EventPayload = {
   hole_number?: number;
   strokes?: number;
   par?: number;
+  // Minigames
+  minigame_id?: string;
+  minigame_display_name?: string;
+  place?: number;
+  points?: number;
 };
 
 function payloadOf(e: ActivityEvent): EventPayload {
@@ -166,6 +172,35 @@ function handleEvent(
     case 'easiest_hole':
       toast(`🍃 Easiest hole on ${event.hole_id}`, { duration: 4000 });
       break;
+    case 'minigame_first_place': {
+      const game = p.minigame_display_name ?? 'a minigame';
+      toast.success(`🥇 ${name} won ${game} (+${p.points ?? 3} pts)`, {
+        duration: 5000,
+        className: 'text-base font-semibold',
+      });
+      // Small celebratory burst — smaller than a birdie.
+      confetti({
+        particleCount: 40,
+        spread: 50,
+        startVelocity: 30,
+        origin: { y: 0.3 },
+        colors: ['#d4af37', '#fbeec0', '#facc15'],
+        scalar: 0.8,
+        disableForReducedMotion: true,
+      });
+      break;
+    }
+    case 'minigame_podium': {
+      const game = p.minigame_display_name ?? 'a minigame';
+      const place = p.place ?? 2;
+      const medal = place === 2 ? '🥈' : '🥉';
+      const ord = place === 2 ? '2nd' : '3rd';
+      const pts = p.points ?? 4 - place;
+      toast(`${medal} ${name} took ${ord} in ${game} (+${pts} pt${pts === 1 ? '' : 's'})`, {
+        duration: 4000,
+      });
+      break;
+    }
     case 'putter_sabotage_target':
       if (event.player_number === myPlayerNumber) {
         setSabotage({
