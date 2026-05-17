@@ -8,7 +8,7 @@ import { useMyPlayer } from '../hooks/useMyPlayer';
 import { useMinigames } from '../hooks/useMinigames';
 import { useMinigamePlacements } from '../hooks/useMinigamePlacements';
 import Avatar from '../components/Avatar';
-import { formatToPar } from '../lib/scoring';
+import { categorize, formatToPar } from '../lib/scoring';
 import type {
   CourseId,
   Minigame,
@@ -209,6 +209,33 @@ export default function Leaderboard() {
   }, [minigameRows]);
   const showTrophy = view === 'overall' || view === 'minigames';
 
+  // Per-course stats strip (L2). Only meaningful on course views.
+  const courseStats = useMemo(() => {
+    if (!courseFilter) return null;
+    const courseHoles = (holes.data ?? []).filter(
+      (h) => h.course_id === courseFilter,
+    );
+    const courseScores = (scores.data ?? []).filter(
+      (s) => courseByHole.get(s.hole_id) === courseFilter,
+    );
+    const par = courseHoles.reduce((acc, h) => acc + h.par, 0);
+    const avgPerHole =
+      courseScores.length === 0
+        ? null
+        : courseScores.reduce((a, s) => a + s.adjusted_score_to_par, 0) /
+          courseScores.length;
+    let birdies = 0;
+    let eagles = 0;
+    let aces = 0;
+    for (const s of courseScores) {
+      const cat = categorize(s.strokes, s.par_snapshot);
+      if (cat === 'ace') aces++;
+      else if (cat === 'eagle') eagles++;
+      else if (cat === 'birdie') birdies++;
+    }
+    return { par, avgPerHole, birdies, eagles, aces };
+  }, [courseFilter, holes.data, scores.data, courseByHole]);
+
   const scorecardLinkFor = (row: Row): string => {
     const params = new URLSearchParams({ card: String(row.card_number) });
     if (isCourseView(view)) params.set('course', view);
@@ -243,6 +270,34 @@ export default function Leaderboard() {
       </header>
 
       <ViewTabs value={view} onChange={setView} />
+
+      {courseStats && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
+          <span>
+            Course par <span className="text-slate-200">{courseStats.par}</span>
+          </span>
+          <span className="text-slate-700">·</span>
+          <span>
+            Field avg{' '}
+            <span className="text-slate-200">
+              {courseStats.avgPerHole == null
+                ? '—'
+                : (courseStats.avgPerHole >= 0 ? '+' : '') +
+                  courseStats.avgPerHole.toFixed(1)}
+            </span>
+          </span>
+          <span className="text-slate-700">·</span>
+          <span>
+            🐦 <span className="text-slate-200">{courseStats.birdies}</span>
+          </span>
+          <span>
+            🦅 <span className="text-slate-200">{courseStats.eagles}</span>
+          </span>
+          <span>
+            🥇 <span className="text-slate-200">{courseStats.aces}</span>
+          </span>
+        </div>
+      )}
 
       {view === 'minigames' ? (
         <MinigamesView
