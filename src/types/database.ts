@@ -87,7 +87,32 @@ export type ActivityEventType =
   | 'exclusive_ace'
   | 'hardest_hole'
   | 'easiest_hole'
-  | 'putter_sabotage_target';
+  | 'putter_sabotage_target'
+  // Phase M (minigames)
+  | 'minigame_first_place'
+  | 'minigame_podium'
+  | 'minigame_champion';
+
+export interface Minigame {
+  id: string;
+  display_name: string;
+  description: string | null;
+  play_order: number;
+  tournament_id: string;
+}
+
+export type Place = 1 | 2 | 3;
+
+export interface MinigamePlacement {
+  id: string;
+  minigame_id: string;
+  tournament_id: string;
+  player_number: number;
+  place: Place;
+  points: number;
+  recorded_by_player_number: number | null;
+  recorded_at: string;
+}
 
 export interface ActivityEvent {
   id: string;

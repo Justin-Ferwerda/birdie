@@ -9,6 +9,7 @@ import { useMyPlayer } from '../hooks/useMyPlayer';
 import Avatar from '../components/Avatar';
 import ScoreEntrySheet from '../components/ScoreEntrySheet';
 import DeclareSheet from '../components/DeclareSheet';
+import MinigamesList from '../components/MinigamesList';
 import { categorize, cellClasses, formatToPar } from '../lib/scoring';
 import { getRule } from '../config/rules';
 import { useCellPulse } from '../lib/celebrate';
@@ -16,11 +17,17 @@ import { computeTeeOrder } from '../lib/teeOrder';
 import type { CourseId, Hole, RuleActivation, Score } from '../types/database';
 import type { TournamentPlayerWithPerson } from '../hooks/useTournamentPlayers';
 
-const COURSE_ORDER: CourseId[] = ['seven_oaks', 'crockett', 'cedar_hill'];
+type TabKey = CourseId | 'minigames';
+
+const TAB_ORDER: TabKey[] = ['seven_oaks', 'crockett', 'cedar_hill', 'minigames'];
 const COURSE_LABEL: Record<CourseId, string> = {
   seven_oaks: 'Seven Oaks',
   crockett: 'Crockett',
   cedar_hill: 'Cedar Hill',
+};
+const TAB_LABEL: Record<TabKey, string> = {
+  ...COURSE_LABEL,
+  minigames: 'Minigames',
 };
 
 export default function Scorecard() {
@@ -43,7 +50,9 @@ export default function Scorecard() {
     return Number.isFinite(n) && n >= 1 && n <= 3 ? n : null;
   })();
 
-  const [courseId, setCourseId] = useState<CourseId>('seven_oaks');
+  const [tabKey, setTabKey] = useState<TabKey>('seven_oaks');
+  const courseId: CourseId =
+    tabKey === 'minigames' ? 'seven_oaks' : tabKey;
   const [cardNumber, setCardNumber] = useState<number | null>(initialCardFromUrl);
 
   // Strip the query param once consumed so subsequent navigations to /scorecard
@@ -184,9 +193,13 @@ export default function Scorecard() {
 
   return (
     <section className="flex flex-col gap-3 px-3 py-4">
-      <CourseTabs value={courseId} onChange={setCourseId} />
+      <TabBar value={tabKey} onChange={setTabKey} />
 
-      <CardTabs
+      {tabKey === 'minigames' ? (
+        <MinigamesList />
+      ) : (
+        <>
+          <CardTabs
         cards={cardNumbers}
         myCard={me?.card_number ?? null}
         value={activeCard}
@@ -412,42 +425,44 @@ export default function Scorecard() {
       })()}
 
       {showDeclare && tournament.data && me && (
-        <DeclareSheet
-          tournament_id={tournament.data.id}
-          primary={me}
-          cardPlayers={cardPlayers}
-          allPlayers={players.data ?? []}
-          courseHoles={courseHoles}
-          courseId={courseId}
-          onClose={() => setShowDeclare(false)}
-        />
+            <DeclareSheet
+              tournament_id={tournament.data.id}
+              primary={me}
+              cardPlayers={cardPlayers}
+              allPlayers={players.data ?? []}
+              courseHoles={courseHoles}
+              courseId={courseId}
+              onClose={() => setShowDeclare(false)}
+            />
+          )}
+        </>
       )}
     </section>
   );
 }
 
-function CourseTabs({
+function TabBar({
   value,
   onChange,
 }: {
-  value: CourseId;
-  onChange: (v: CourseId) => void;
+  value: TabKey;
+  onChange: (v: TabKey) => void;
 }) {
   return (
     <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-1">
-      {COURSE_ORDER.map((c) => (
+      {TAB_ORDER.map((t) => (
         <button
-          key={c}
+          key={t}
           type="button"
-          onClick={() => onChange(c)}
+          onClick={() => onChange(t)}
           className={[
-            'flex-1 rounded-md py-1.5 text-xs font-medium transition-colors',
-            value === c
+            'flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors',
+            value === t
               ? 'bg-gold-500 text-slate-950'
               : 'text-slate-300 active:bg-slate-800',
           ].join(' ')}
         >
-          {COURSE_LABEL[c]}
+          {TAB_LABEL[t]}
         </button>
       ))}
     </div>
