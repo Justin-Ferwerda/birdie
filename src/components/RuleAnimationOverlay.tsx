@@ -5,6 +5,7 @@ import { useRuleAnimationStore } from '../lib/ruleAnimations';
  *  the animation's duration. */
 export default function RuleAnimationOverlay() {
   const current = useRuleAnimationStore((s) => s.current);
+  const clear = useRuleAnimationStore((s) => s.clear);
   if (!current) return null;
 
   switch (current.kind) {
@@ -14,6 +15,13 @@ export default function RuleAnimationOverlay() {
       return <Marshmallow />;
     case 'shotgun':
       return <Shotgun fastestName={current.payload?.fastest_name} />;
+    case 'minigame_champion':
+      return (
+        <MinigameChampion
+          name={current.payload?.champion_name}
+          onDismiss={() => clear(current.id)}
+        />
+      );
   }
 }
 
@@ -54,6 +62,38 @@ function Marshmallow() {
         );
       })}
     </div>
+  );
+}
+
+function MinigameChampion({
+  name,
+  onDismiss,
+}: {
+  name?: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onDismiss}
+      aria-label="Dismiss champion celebration"
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-6 bg-slate-950/85 backdrop-blur"
+    >
+      <div className="animate-rule-champion-trophy text-9xl" aria-hidden>
+        🏆
+      </div>
+      <div className="animate-rule-champion-name flex flex-col items-center gap-1 px-4">
+        <div className="text-xs font-bold uppercase tracking-widest text-gold-400">
+          Minigames Champion
+        </div>
+        <div className="text-center text-3xl font-black text-slate-50">
+          {name ?? 'Champion'}
+        </div>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">
+        Tap to dismiss
+      </div>
+    </button>
   );
 }
 

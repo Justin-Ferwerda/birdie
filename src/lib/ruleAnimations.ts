@@ -4,10 +4,15 @@
 
 import { create } from 'zustand';
 
-export type RuleAnimationKind = 'full_moon' | 'marshmallow' | 'shotgun';
+export type RuleAnimationKind =
+  | 'full_moon'
+  | 'marshmallow'
+  | 'shotgun'
+  | 'minigame_champion';
 
 interface RuleAnimationPayload {
   fastest_name?: string;
+  champion_name?: string;
 }
 
 interface ActiveRuleAnimation {
@@ -26,6 +31,7 @@ const DURATION_MS: Record<RuleAnimationKind, number> = {
   full_moon: 1500,
   marshmallow: 1200,
   shotgun: 1800,
+  minigame_champion: 4000,
 };
 
 let nextId = 1;

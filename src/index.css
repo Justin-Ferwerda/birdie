@@ -132,6 +132,22 @@ body {
 }
 .animate-rule-shotgun-name { animation: rule-shotgun-name 1800ms ease-out 1; }
 
+/* Minigames champion: gold trophy scales + bobs, name fades in below. */
+@keyframes rule-champion-trophy {
+  0%   { transform: scale(0.3) translateY(40px); opacity: 0; }
+  30%  { transform: scale(1.2) translateY(-10px); opacity: 1; }
+  50%  { transform: scale(1) translateY(0); }
+  60%  { transform: scale(1.08) translateY(-6px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes rule-champion-name {
+  0%, 30% { opacity: 0; transform: translateY(16px); }
+  55%     { opacity: 1; transform: translateY(0); }
+  100%    { opacity: 1; transform: translateY(0); }
+}
+.animate-rule-champion-trophy { animation: rule-champion-trophy 1200ms ease-out 1; }
+.animate-rule-champion-name   { animation: rule-champion-name 1500ms ease-out 1; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rule-dui,
   .animate-rule-typewriter,
@@ -139,7 +155,9 @@ body {
   .animate-rule-marshmallow,
   .animate-rule-shotgun-mug-left,
   .animate-rule-shotgun-mug-right,
-  .animate-rule-shotgun-name {
+  .animate-rule-shotgun-name,
+  .animate-rule-champion-trophy,
+  .animate-rule-champion-name {
     animation: none;
   }
 }

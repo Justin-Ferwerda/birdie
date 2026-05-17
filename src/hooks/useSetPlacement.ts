@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { recordPlacementEvents } from '../lib/events';
+import { detectMinigameChampion } from '../lib/detection';
 import type { Place } from '../types/database';
 
 export interface SetPlacementArgs {
@@ -80,6 +81,10 @@ async function setPlacement(args: SetPlacementArgs) {
           }
         : undefined,
   });
+
+  // Phase M6: re-evaluate the champion. Only fires the event on a real
+  // leader change (insert noisy edits don't replay the celebration).
+  await detectMinigameChampion(tournament_id);
 }
 
 export function useSetPlacement() {

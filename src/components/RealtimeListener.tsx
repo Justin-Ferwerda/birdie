@@ -25,6 +25,8 @@ type EventPayload = {
   minigame_display_name?: string;
   place?: number;
   points?: number;
+  champion_name?: string;
+  total_points?: number;
 };
 
 function payloadOf(e: ActivityEvent): EventPayload {
@@ -199,6 +201,43 @@ function handleEvent(
       toast(`${medal} ${name} took ${ord} in ${game} (+${pts} pt${pts === 1 ? '' : 's'})`, {
         duration: 4000,
       });
+      break;
+    }
+    case 'minigame_champion': {
+      const championName = p.champion_name ?? name;
+      toast.success(`🏆 ${championName} IS THE MINIGAMES CHAMPION! 🏆`, {
+        duration: 8000,
+        className: 'text-base font-black',
+      });
+      // Big gold burst — more particles than a birdie/eagle, plus side cannons.
+      const palette = ['#d4af37', '#fbeec0', '#facc15', '#fde047', '#ffffff'];
+      confetti({
+        particleCount: 220,
+        spread: 110,
+        origin: { y: 0.4, x: 0.5 },
+        colors: palette,
+        scalar: 1.1,
+        disableForReducedMotion: true,
+      });
+      confetti({
+        particleCount: 90,
+        angle: 60,
+        spread: 70,
+        startVelocity: 55,
+        origin: { x: 0, y: 0.7 },
+        colors: palette,
+        disableForReducedMotion: true,
+      });
+      confetti({
+        particleCount: 90,
+        angle: 120,
+        spread: 70,
+        startVelocity: 55,
+        origin: { x: 1, y: 0.7 },
+        colors: palette,
+        disableForReducedMotion: true,
+      });
+      triggerRuleAnimation('minigame_champion', { champion_name: championName });
       break;
     }
     case 'putter_sabotage_target':

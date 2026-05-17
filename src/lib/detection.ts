@@ -141,6 +141,88 @@ export async function runHoleCompleteDetection(
   }
 }
 
+/** Phase M6: minigames champion.
+ *
+ * Re-evaluates after every placement change. Only inserts (or deletes) the
+ * minigame_champion event when the champion actually changed — avoids
+ * re-firing the celebration on every edit. */
+export async function detectMinigameChampion(tournament_id: string) {
+  const { data: placements, error: pErr } = await supabase
+    .from('minigame_placements')
+    .select('player_number, points')
+    .eq('tournament_id', tournament_id);
+  if (pErr) throw pErr;
+
+  const allScored = (placements?.length ?? 0) >= 18;
+
+  // Compute the SHOULD-BE champion (null if not all scored or there's a tie at top).
+  let newChampion: { player_number: number; points: number } | null = null;
+  if (allScored && placements) {
+    const pointsByPlayer = new Map<number, number>();
+    placements.forEach((p) => {
+      pointsByPlayer.set(
+        p.player_number,
+        (pointsByPlayer.get(p.player_number) ?? 0) + p.points,
+      );
+    });
+    const sorted = Array.from(pointsByPlayer.entries()).sort(
+      (a, b) => b[1] - a[1],
+    );
+    if (sorted.length > 0) {
+      const [topPn, topPts] = sorted[0];
+      const tied = sorted.length > 1 && sorted[1][1] === topPts;
+      if (!tied) newChampion = { player_number: topPn, points: topPts };
+    }
+  }
+
+  // Current event (if any).
+  const { data: existing, error: eErr } = await supabase
+    .from('activity_events')
+    .select('id, player_number')
+    .eq('tournament_id', tournament_id)
+    .eq('event_type', 'minigame_champion')
+    .maybeSingle();
+  if (eErr) throw eErr;
+
+  const championChanged =
+    (existing?.player_number ?? null) !== (newChampion?.player_number ?? null);
+  if (!championChanged) return;
+
+  if (existing) {
+    const { error: dErr } = await supabase
+      .from('activity_events')
+      .delete()
+      .eq('id', existing.id);
+    if (dErr) throw dErr;
+  }
+
+  if (newChampion) {
+    const { data: tp, error: tpErr } = await supabase
+      .from('tournament_players')
+      .select('display_name')
+      .eq('tournament_id', tournament_id)
+      .eq('player_number', newChampion.player_number)
+      .maybeSingle();
+    if (tpErr) throw tpErr;
+
+    const { error: iErr } = await supabase.from('activity_events').insert({
+      tournament_id,
+      event_type: 'minigame_champion',
+      player_number: newChampion.player_number,
+      hole_id: null,
+      payload: {
+        champion_name: tp?.display_name,
+        player_display_name: tp?.display_name,
+        total_points: newChampion.points,
+      },
+    });
+    // Concurrent inserts race on the partial unique index — ignore that case.
+    if (iErr && (iErr as { code?: string }).code !== PG_UNIQUE_VIOLATION) {
+      throw iErr;
+    }
+  }
+}
+
 export async function applyGentlemensTeeBonus(
   tournament_id: string,
   hole_id: string,
