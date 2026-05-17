@@ -49,18 +49,24 @@ export default function Scorecard() {
     const n = v ? parseInt(v, 10) : NaN;
     return Number.isFinite(n) && n >= 1 && n <= 3 ? n : null;
   })();
+  const initialCourseFromUrl: CourseId | null = (() => {
+    const v = searchParams.get('course');
+    if (v === 'seven_oaks' || v === 'crockett' || v === 'cedar_hill') return v;
+    return null;
+  })();
 
-  const [tabKey, setTabKey] = useState<TabKey>('seven_oaks');
+  const [tabKey, setTabKey] = useState<TabKey>(initialCourseFromUrl ?? 'seven_oaks');
   const courseId: CourseId =
     tabKey === 'minigames' ? 'seven_oaks' : tabKey;
   const [cardNumber, setCardNumber] = useState<number | null>(initialCardFromUrl);
 
-  // Strip the query param once consumed so subsequent navigations to /scorecard
-  // don't re-snap to that card.
+  // Strip any consumed query params so subsequent navigations to /scorecard
+  // don't re-snap to the same card/course.
   useEffect(() => {
-    if (initialCardFromUrl != null && searchParams.has('card')) {
+    if (searchParams.has('card') || searchParams.has('course')) {
       const next = new URLSearchParams(searchParams);
       next.delete('card');
+      next.delete('course');
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

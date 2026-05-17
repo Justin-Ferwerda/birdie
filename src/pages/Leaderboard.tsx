@@ -2,16 +2,42 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTournamentPlayers } from '../hooks/useTournamentPlayers';
 import { useScores } from '../hooks/useScores';
+import { useHoles } from '../hooks/useHoles';
 import { useRuleActivations } from '../hooks/useRuleActivations';
 import { useMyPlayer } from '../hooks/useMyPlayer';
 import { useMinigames } from '../hooks/useMinigames';
 import { useMinigamePlacements } from '../hooks/useMinigamePlacements';
 import Avatar from '../components/Avatar';
 import { formatToPar } from '../lib/scoring';
-import type { Minigame, MinigamePlacement, Place } from '../types/database';
+import type {
+  CourseId,
+  Minigame,
+  MinigamePlacement,
+  Place,
+  Score,
+} from '../types/database';
 
 type Mode = 'adjusted' | 'raw';
-type View = 'main' | 'minigames';
+type View = 'overall' | CourseId | 'minigames';
+
+const VIEW_ORDER: View[] = [
+  'overall',
+  'seven_oaks',
+  'crockett',
+  'cedar_hill',
+  'minigames',
+];
+const VIEW_LABEL: Record<View, string> = {
+  overall: 'Overall',
+  seven_oaks: 'Seven Oaks',
+  crockett: 'Crockett',
+  cedar_hill: 'Cedar Hill',
+  minigames: 'Minigames',
+};
+
+function isCourseView(v: View): v is CourseId {
+  return v === 'seven_oaks' || v === 'crockett' || v === 'cedar_hill';
+}
 
 interface Row {
   player_number: number;
@@ -37,19 +63,41 @@ export default function Leaderboard() {
   const navigate = useNavigate();
   const players = useTournamentPlayers();
   const scores = useScores();
+  const holes = useHoles();
   const activations = useRuleActivations();
   const minigamesQ = useMinigames();
   const placementsQ = useMinigamePlacements();
   const { playerNumber: myPlayerNumber } = useMyPlayer();
-  const [view, setView] = useState<View>('main');
+  const [view, setView] = useState<View>('overall');
   const [mode, setMode] = useState<Mode>('adjusted');
   const [expandedPlayer, setExpandedPlayer] = useState<number | null>(null);
 
-  // --- Main tournament rows -----------------------------------------------
+  // hole_id → course_id lookup, plus per-course hole sets.
+  const courseByHole = useMemo(() => {
+    const m = new Map<string, CourseId>();
+    (holes.data ?? []).forEach((h) => m.set(h.id, h.course_id));
+    return m;
+  }, [holes.data]);
+
+  // --- Per-view scope -----------------------------------------------------
+  const courseFilter: CourseId | null = isCourseView(view) ? view : null;
+
+  // Filter helpers (null filter = all scores / all activations).
+  const inScopeScore = (s: Score) =>
+    courseFilter == null || courseByHole.get(s.hole_id) === courseFilter;
+
+  const inScopeActivation = (hole_id: string | null) => {
+    if (courseFilter == null) return true;
+    if (!hole_id) return false; // declarations without a hole don't count toward a course
+    return courseByHole.get(hole_id) === courseFilter;
+  };
+
+  // --- Main / per-course rows --------------------------------------------
   const rows: Row[] = useMemo(() => {
     if (!players.data) return [];
     const rulesByPlayer = new Map<number, number>();
     (activations.data ?? []).forEach((a) => {
+      if (!inScopeActivation(a.hole_id)) return;
       rulesByPlayer.set(
         a.primary_player_number,
         (rulesByPlayer.get(a.primary_player_number) ?? 0) + 1,
@@ -57,7 +105,9 @@ export default function Leaderboard() {
     });
 
     return players.data.map((p) => {
-      const mine = (scores.data ?? []).filter((s) => s.player_number === p.player_number);
+      const mine = (scores.data ?? []).filter(
+        (s) => s.player_number === p.player_number && inScopeScore(s),
+      );
       const thru = mine.length;
       const raw = mine.reduce((acc, s) => acc + s.hole_score_to_par, 0);
       const adjusted = mine.reduce(
@@ -75,7 +125,8 @@ export default function Leaderboard() {
         rules_burned: rulesByPlayer.get(p.player_number) ?? 0,
       };
     });
-  }, [players.data, scores.data, activations.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players.data, scores.data, activations.data, view, courseByHole]);
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
@@ -146,21 +197,31 @@ export default function Leaderboard() {
       });
   }, [players.data, minigamesQ.data, placementsQ.data]);
 
-  // Current minigame leader(s) — for the 🏆 badge on the main view too.
+  // Current minigame leader(s). Trophy only shows on Overall + Minigames
+  // views per spec; per-course views don't get it.
   const trophyHolderNumbers = useMemo(() => {
     if (minigameRows.length === 0) return new Set<number>();
     const top = minigameRows[0].points;
-    if (top === 0) return new Set<number>(); // nobody's placed yet
+    if (top === 0) return new Set<number>();
     return new Set(
       minigameRows.filter((r) => r.points === top).map((r) => r.player_number),
     );
   }, [minigameRows]);
+  const showTrophy = view === 'overall' || view === 'minigames';
+
+  const scorecardLinkFor = (row: Row): string => {
+    const params = new URLSearchParams({ card: String(row.card_number) });
+    if (isCourseView(view)) params.set('course', view);
+    return `/scorecard?${params.toString()}`;
+  };
 
   return (
     <section className="mx-auto flex max-w-md flex-col gap-3 px-4 py-4">
       <header className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">Leaderboard</h2>
-        {view === 'main' && (
+        <h2 className="text-xl font-semibold tracking-tight">
+          {isCourseView(view) ? `${VIEW_LABEL[view]} Leaderboard` : 'Leaderboard'}
+        </h2>
+        {view !== 'minigames' && (
           <div className="flex gap-1 rounded-md border border-slate-800 bg-slate-900 p-0.5 text-xs">
             {(['adjusted', 'raw'] as Mode[]).map((m) => (
               <button
@@ -181,35 +242,9 @@ export default function Leaderboard() {
         )}
       </header>
 
-      <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-1">
-        {(['main', 'minigames'] as View[]).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setView(v)}
-            className={[
-              'flex-1 rounded-md py-1.5 text-xs font-medium transition-colors',
-              view === v
-                ? 'bg-gold-500 text-slate-950'
-                : 'text-slate-300 active:bg-slate-800',
-            ].join(' ')}
-          >
-            {v === 'main' ? 'Main Tournament' : 'Minigames'}
-          </button>
-        ))}
-      </div>
+      <ViewTabs value={view} onChange={setView} />
 
-      {view === 'main' ? (
-        <MainView
-          sorted={sorted}
-          positions={positions}
-          mode={mode}
-          myPlayerNumber={myPlayerNumber}
-          trophyHolderNumbers={trophyHolderNumbers}
-          loading={players.isLoading}
-          onWalletTap={(pn) => navigate(`/wallet/${pn}`)}
-        />
-      ) : (
+      {view === 'minigames' ? (
         <MinigamesView
           rows={minigameRows}
           loading={players.isLoading || minigamesQ.isLoading}
@@ -220,8 +255,52 @@ export default function Leaderboard() {
             setExpandedPlayer((cur) => (cur === pn ? null : pn))
           }
         />
+      ) : (
+        <MainView
+          sorted={sorted}
+          positions={positions}
+          mode={mode}
+          myPlayerNumber={myPlayerNumber}
+          trophyHolderNumbers={showTrophy ? trophyHolderNumbers : new Set()}
+          loading={players.isLoading}
+          linkFor={scorecardLinkFor}
+          onWalletTap={(pn) => navigate(`/wallet/${pn}`)}
+        />
       )}
     </section>
+  );
+}
+
+function ViewTabs({
+  value,
+  onChange,
+}: {
+  value: View;
+  onChange: (v: View) => void;
+}) {
+  return (
+    // Horizontally scrolling pill row — 5 options don't fit comfortably on
+    // phones, so let them swipe.
+    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+      {VIEW_ORDER.map((v) => {
+        const active = v === value;
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={[
+              'shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              active
+                ? 'border-gold-500 bg-gold-500 text-slate-950 font-semibold'
+                : 'border-slate-700 bg-slate-900 text-slate-300 active:bg-slate-800',
+            ].join(' ')}
+          >
+            {VIEW_LABEL[v]}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -232,6 +311,7 @@ function MainView({
   myPlayerNumber,
   trophyHolderNumbers,
   loading,
+  linkFor,
   onWalletTap,
 }: {
   sorted: Row[];
@@ -240,6 +320,7 @@ function MainView({
   myPlayerNumber: number | null;
   trophyHolderNumbers: Set<number>;
   loading: boolean;
+  linkFor: (row: Row) => string;
   onWalletTap: (pn: number) => void;
 }) {
   if (loading) {
@@ -261,7 +342,7 @@ function MainView({
         return (
           <li key={r.player_number}>
             <Link
-              to={`/scorecard?card=${r.card_number}`}
+              to={linkFor(r)}
               className={[
                 'flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors',
                 isMe
@@ -353,7 +434,6 @@ function MinigamesView({
     );
   }
 
-  // Tied position labels.
   const positions: string[] = [];
   let i = 0;
   while (i < rows.length) {
